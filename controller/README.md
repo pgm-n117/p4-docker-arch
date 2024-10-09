@@ -54,7 +54,7 @@ You can follow the template to check the minimal requirements for the ONOS code 
 It is recommended to use IntelliJ IDEA to develop the ONOS applications, as it also allows to debug the code in the ONOS controller.
 
 The ONOS debug configuration can be seen in the following image:
-![ONOS Debug Configuration](./ONOS remote debug config.jpg)
+![ONOS Debug Configuration](./ONOS_remote_debug_config.jpg)
 
 
 # Basic Pipeline
