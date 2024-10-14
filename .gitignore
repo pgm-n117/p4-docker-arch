@@ -1,2 +1,7 @@
 .vscode/launch.json
 *.pyc
+*.oar
+*.jar
+*.class
+*.idea
+target

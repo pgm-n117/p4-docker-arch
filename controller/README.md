@@ -21,10 +21,12 @@ docker run -d \
 
 # ONOS Application basic structure
 
-The basic structure of an ONOS application can be started using the ONOS command:
+The basic structure of an ONOS application can be created using the ONOS command:
 ```
 onos-create-app app
 ```
+This will create a directory with the basic structure of an ONOS application, including the pom.xml file, the main Java class and the test class. The app name must be a valid Java package name, and must be unique in the ONOS controller.
+**Avoid using "-" characters in the app name, as it can cause errors.**
 
 The following project structure must be followed to avoid errors in the ONOS application:
 ```
@@ -51,7 +53,7 @@ rootapplication
 
 The basic template for the main Java class, test class and pom.xml file is shown in the basic template directory.
 You can follow the template to check the minimal requirements for the ONOS code to work.
-It is recommended to use IntelliJ IDEA to develop the ONOS applications, as it also allows to debug the code in the ONOS controller.
+It is recommended to use IntelliJ IDEA to develop the ONOS applications, as it also allows to debug the code during its execution in the ONOS controller.
 
 The ONOS debug configuration can be seen in the following image:
 ![ONOS Debug Configuration](./ONOS_remote_debug_config.jpg)
@@ -59,12 +61,12 @@ The ONOS debug configuration can be seen in the following image:
 
 # Basic Pipeline
 TODO
-## Necesary ONOS Apps
+## Necessary ONOS Apps
 From the docker ONOS command:
 ```
 "org.onosproject.drivers.bmv2,org.onosproject.pipelines.basic,org.onosproject.hostprovider,org.onosproject.lldpprovider,org.onosproject.linkdiscovery,org.onosproject.proxyarp,org.onosproject.hostprobingprovider,org.onosproject.drivers.p4runtime,org.onosproject.drivers.stratum,org.onosproject.drivers,org.onosproject.gui2"
 ```
-## Connection of a switch to the controller
+## Connecting a switch to the controller
 Connecting a switch to the ONOS controller is done through the ONOS REST API. It consists on adding devices to the configuration, specifying the management address and the necessary driver to communicate with the switch. In this case, P4 switches based on the BMv2 software switch need BMv2 drivers, such as stratum-bmv2 and bmv2. This drivers must be activated in the ONOS apps in order to be able to connect the switch to the controller.
 
 The REST API call to add a device to the controller is as follows:
@@ -98,7 +100,7 @@ Where the `onos-netcfg.json` file contains the configuration of the switch, such
 }
 ```
 
-**This configuration and connection with the controller is already implemented in the stratum_bmv2.py file.**
+**This configuration and connection with the controller is already implemented in the [stratum_bmv2.py](../nodes/dswitch/stratum_bmv2/stratum_containernet.py) file.**
 
 
 # Advanced Pipeline deployment
