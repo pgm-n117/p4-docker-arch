@@ -51,7 +51,7 @@ import socket
 import json
 import multiprocessing
 import threading
-import time
+from time import sleep
 
 from ..DockerSwitch.DockerSwitch import DockerSwitch
 
@@ -237,24 +237,29 @@ class StratumBmv2DockerSwitch(DockerSwitch):
 
         self.cmd("echo '"+json.dumps(cfgData, indent=4)+"' > "+self.netcfgFile)
 
+        configured = False
+        while not configured:
+            # Build netcfg URL
+            url = 'http://%s:8181/onos/v1/network/configuration/' % controllerIP
+            # Instantiate password manager for HTTP auth
+            pm = urllib.request.HTTPPasswordMgrWithDefaultRealm()
+            pm.add_password(None, url, ONOS_WEB_USER, ONOS_WEB_PASS)
+            urllib.request.install_opener(urllib.request.build_opener(
+                urllib.request.HTTPBasicAuthHandler(pm)))
+            # Push config data to controller
+            req = urllib.request.Request(url, json.dumps(cfgData),
+                                  {'Content-Type': 'application/json'})
+            try:
 
-        # Build netcfg URL
-        url = 'http://%s:8181/onos/v1/network/configuration/' % controllerIP
-        # Instantiate password manager for HTTP auth
-        pm = urllib.request.HTTPPasswordMgrWithDefaultRealm()
-        pm.add_password(None, url, ONOS_WEB_USER, ONOS_WEB_PASS)
-        urllib.request.install_opener(urllib.request.build_opener(
-            urllib.request.HTTPBasicAuthHandler(pm)))
-        # Push config data to controller
-        req = urllib.request.Request(url, json.dumps(cfgData),
-                              {'Content-Type': 'application/json'})
-        try:
-
-            f = urllib.request.urlopen(req, data=json.dumps(cfgData).encode('utf-8'))
-            #print(f.read())
-            f.close()
-        except urllib.error.URLError as e:
-            warn("*** WARN: unable to push config to ONOS (%s)\n" % e.reason)
+                f = urllib.request.urlopen(req, data=json.dumps(cfgData).encode('utf-8'))
+                if f.getcode() == 200:
+                    info("Pushed config to ONOS\n")
+                    configured = True
+                #print(f.read())
+                f.close()
+            except urllib.error.URLError as e:
+                warn("*** WARN: unable to push config to ONOS (%s)\n" % e.reason)
+                sleep(4)
     
 
 
@@ -304,27 +309,11 @@ nodes {{
             ## This is necessary, because the interfaces are not active on containers even 
             ## if they are added on the mininet script
             self.set_up_interfaces()
-            #links = self.intfList()
-            #for intf in links:
-            #    #check if interfaces are up, and if they are not, bring them up
-            #    if not self.cmd("ip link show {}".format(intf.name)).split()[8] == "UP":
-            #        self.cmd("ip link set {} up".format(intf.name))
 
-
-            #writeToFile("%s/grpc-port.txt" % self.tmpDir, self.grpcPort)
             self.cmd("echo '"+str(self.grpcPort) + "' > "+self.tmpDir+"/grpc-port.txt")
 
-            #with open(self.chassisConfigFile, 'w') as fp:
-            #    fp.write(self.getChassisConfig())
+
             self.cmd("echo '"+self.getChassisConfig()+"' > "+self.chassisConfigFile)
-
-            #with open(self.netcfgFile, 'w') as fp:
-            #    json.dump(self.getOnosNetcfg(), fp, indent=2)
-            ##self.cmd("echo '"+json.dumps(self.getOnosNetcfg(), indent=2)+"' > "+self.netcfgFile)
-
-            
-
-
 
 
             args = [
@@ -344,15 +333,9 @@ nodes {{
             cmd_string = " ".join(args)
 
         
-
-            # Write cmd_string to log for debugging.
-            #self.logfd = open(self.logfile, "w")
-            #self.logfd.write(cmd_string + "\n\n" + "-" * 80 + "\n\n")
-            #self.logfd.flush()
             self.cmd("echo '"+cmd_string + "\n\n" + "-" * 80 + "\n\n' > "+self.logfile)
             
 
-            #self.bmv2popen = self.popen(cmd_string, stdout=self.logfd, stderr=self.logfd)
             #launch cmd_string command in the container and save the process id
             self.cmd(cmd_string + " > "+self.logfile+" 2>&1 & echo $! > "+self.tmpDir+"/bmv2popen.pid")
             self.bmv2pid = int(self.cmd("cat "+self.tmpDir+"/bmv2popen.pid"))
@@ -361,7 +344,6 @@ nodes {{
             # We want to be notified if stratum_bmv2 quits prematurely...
             self.check_docker_switch_started(self.bmv2pid, [self.grpcPort])
             self.stopped = False
-            #threading.Thread(target=watchdog, args=[self]).start()
 
             #this is specific for ONOS controller.
             self.doOnosNetcfg(self.controllerAddress)

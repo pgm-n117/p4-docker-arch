@@ -1,5 +1,3 @@
-ONOS Controller
-
 # ONOS Controller Deploy
 
 ## Docker Image
