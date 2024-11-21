@@ -67,7 +67,7 @@ import urllib
 
 DEFAULT_NODE_ID = 1
 DEFAULT_CPU_PORT = 255
-DEFAULT_PIPECONF = "org.onosproject.pipelines.basic"
+DEFAULT_PIPECONF = "org.onosproject.pipelines.int"
 
 STRATUM_BMV2 = 'stratum_bmv2'
 STRATUM_INIT_PIPELINE = '/root/dummy.json'
@@ -120,7 +120,7 @@ class StratumBmv2DockerSwitch(DockerSwitch):
     # be running.
     mininet_exception = multiprocessing.Value('i', 0)
 
-    #TODO UPdating this value when using containers is not necessary, the port can be the same in every container
+    #TODO Updating this value when using containers is not necessary, the port can be the same in every container
     nextGrpcPort = 50001
 
     def __init__(self, name, json=STRATUM_INIT_PIPELINE, loglevel="warn",
@@ -156,7 +156,8 @@ class StratumBmv2DockerSwitch(DockerSwitch):
             self.onosDeviceId = onosdevid
         else:
             # The "device:" prefix is required by ONOS.
-            self.onosDeviceId = "device:%s" % self.name
+            hexname = bytes(self.name, 'utf-8').hex()
+            self.onosDeviceId = "device:%s" % str(hexname)
         self.nodeId = DEFAULT_NODE_ID
         self.logfd = None
         self.bmv2popen = None
@@ -331,7 +332,7 @@ nodes {{
             ]
 
             cmd_string = " ".join(args)
-
+            print("⚡️ %s @ %d, CMD: %s" % (STRATUM_BMV2, self.grpcPort, cmd_string))
         
             self.cmd("echo '"+cmd_string + "\n\n" + "-" * 80 + "\n\n' > "+self.logfile)
             

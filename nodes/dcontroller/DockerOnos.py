@@ -1,16 +1,9 @@
 import docker
-from sys import exit
-import os
-from os import environ
-import tempfile
 import socket
 from time import sleep
-import re
-
 import urllib.error
 import urllib.request
 import urllib.response
-import json
 
 
 ONOS_WEB_USER = "onos"
@@ -121,10 +114,10 @@ class DockerOnos():
         self.dcli.pull(dimage)
 
         # for DEBUG
-        print("Created docker container object %s\n" % name)
-        print("image: %s\n" % str(self.dimage))
-        print("dcmd: %s\n" % str(self.dcmd))
-        print("%s: kwargs %s\n" % (name, str(kwargs)))
+        #print("Created docker container object %s\n" % name)
+        #print("image: %s\n" % str(self.dimage))
+        #print("dcmd: %s\n" % str(self.dcmd))
+        #print("%s: kwargs %s\n" % (name, str(kwargs)))
 
 
 
@@ -220,7 +213,7 @@ class DockerOnos():
                     sock.settimeout(0.5)
                     ip_addrs = self.d_client.containers.get(self.name).exec_run("hostname -I").output.decode().strip()
                     socketResult = sock.connect_ex((ip_addrs, port))
-                    print("Socket Result: %d\n" % socketResult)
+                    #print("Socket Result: %d\n" % socketResult)
 
 
                     # Build netcfg URL
@@ -246,17 +239,14 @@ class DockerOnos():
                 except urllib.error.URLError as e:
                     print("Error connecting to controller port " + str(port) + ": " + "Status: "+ str(e.status) + " " +e.reason)
                 finally:
-                    print("Connection result: %s\n" % str(connectionResult))
+                    #print("Connection result: %s\n" % str(connectionResult))
                     if f is not None:
                         if f.getcode() == 200:
                             f.close()
                             connectionResult = True
 
                 retries -= 1
-                #if result != 0:
-                #    raise Exception("Controller port {} is not open in {}.\n".format(port, self.name))
-                #    return  False
-                print("while conditions: Retries="+str(retries)+", Socket Result="+str(socketResult)+", Connection Result="+str(connectionResult))
+                #print("while conditions: Retries="+str(retries)+", Socket Result="+str(socketResult)+", Connection Result="+str(connectionResult))
         return bool(not socketResult) and connectionResult
 
     def stop(self):
