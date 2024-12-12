@@ -1,0 +1,210 @@
+pkg_info {
+  arch: "v1model"
+}
+tables {
+  preamble {
+    id: 33564444
+    name: "MyIngress.table0_portforward_control.table0"
+    alias: "table0"
+  }
+  match_fields {
+    id: 1
+    name: "standard_metadata.ingress_port"
+    bitwidth: 9
+    match_type: TERNARY
+  }
+  match_fields {
+    id: 2
+    name: "hdr.ethernet.src_addr"
+    bitwidth: 48
+    match_type: TERNARY
+  }
+  match_fields {
+    id: 3
+    name: "hdr.ethernet.dst_addr"
+    bitwidth: 48
+    match_type: TERNARY
+  }
+  match_fields {
+    id: 4
+    name: "hdr.ethernet.ether_type"
+    bitwidth: 16
+    match_type: TERNARY
+  }
+  match_fields {
+    id: 5
+    name: "hdr.ipv4.src_addr"
+    bitwidth: 32
+    match_type: TERNARY
+  }
+  match_fields {
+    id: 6
+    name: "hdr.ipv4.dst_addr"
+    bitwidth: 32
+    match_type: TERNARY
+  }
+  match_fields {
+    id: 7
+    name: "hdr.ipv4.protocol"
+    bitwidth: 8
+    match_type: TERNARY
+  }
+  match_fields {
+    id: 8
+    name: "local_metadata.l4_src_port"
+    bitwidth: 16
+    match_type: TERNARY
+  }
+  match_fields {
+    id: 9
+    name: "local_metadata.l4_dst_port"
+    bitwidth: 16
+    match_type: TERNARY
+  }
+  action_refs {
+    id: 16831713
+  }
+  action_refs {
+    id: 16779678
+  }
+  action_refs {
+    id: 16781077
+  }
+  action_refs {
+    id: 16793765
+  }
+  const_default_action_id: 16793765
+  direct_resource_ids: 318774144
+  size: 1024
+}
+actions {
+  preamble {
+    id: 16781077
+    name: "MyIngress.table0_portforward_control.set_next_hop_id"
+    alias: "set_next_hop_id"
+  }
+  params {
+    id: 1
+    name: "next_hop_id"
+    bitwidth: 16
+  }
+}
+actions {
+  preamble {
+    id: 16779678
+    name: "MyIngress.table0_portforward_control.send_to_cpu"
+    alias: "send_to_cpu"
+  }
+}
+actions {
+  preamble {
+    id: 16831713
+    name: "MyIngress.table0_portforward_control.set_egress_port"
+    alias: "set_egress_port"
+  }
+  params {
+    id: 1
+    name: "port"
+    bitwidth: 9
+  }
+}
+actions {
+  preamble {
+    id: 16793765
+    name: "MyIngress.table0_portforward_control.drop"
+    alias: "drop"
+  }
+}
+counters {
+  preamble {
+    id: 301997337
+    name: "MyIngress.port_counters_ingress.ingress_port_counter"
+    alias: "ingress_port_counter"
+  }
+  spec {
+    unit: PACKETS
+  }
+  size: 511
+}
+counters {
+  preamble {
+    id: 302050525
+    name: "MyEgress.port_counters_egress.egress_port_counter"
+    alias: "egress_port_counter"
+  }
+  spec {
+    unit: PACKETS
+  }
+  size: 511
+}
+direct_counters {
+  preamble {
+    id: 318774144
+    name: "MyIngress.table0_portforward_control.table0_counter"
+    alias: "table0_counter"
+  }
+  spec {
+    unit: BOTH
+  }
+  direct_table_id: 33564444
+}
+meters {
+  preamble {
+    id: 335589341
+    name: "MyIngress.port_meters_ingress.ingress_port_meter"
+    alias: "ingress_port_meter"
+  }
+  spec {
+    unit: BYTES
+  }
+  size: 511
+}
+meters {
+  preamble {
+    id: 335608964
+    name: "MyEgress.port_meters_egress.egress_port_meter"
+    alias: "egress_port_meter"
+  }
+  spec {
+    unit: BYTES
+  }
+  size: 511
+}
+controller_packet_metadata {
+  preamble {
+    id: 67146229
+    name: "packet_in"
+    alias: "packet_in"
+    annotations: "@controller_header(\"packet_in\")"
+  }
+  metadata {
+    id: 1
+    name: "ingress_port"
+    bitwidth: 9
+  }
+  metadata {
+    id: 2
+    name: "_padding"
+    bitwidth: 7
+  }
+}
+controller_packet_metadata {
+  preamble {
+    id: 67121543
+    name: "packet_out"
+    alias: "packet_out"
+    annotations: "@controller_header(\"packet_out\")"
+  }
+  metadata {
+    id: 1
+    name: "egress_port"
+    bitwidth: 9
+  }
+  metadata {
+    id: 2
+    name: "_padding"
+    bitwidth: 7
+  }
+}
+type_info {
+}

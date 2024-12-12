@@ -81,8 +81,5 @@ public class BasicPipelineConstants {
     public static final PiMeterId EGRESS_PORT_METERS_EGRESS_EGRESS_PORT_METER =
             PiMeterId.of("egress.port_meters_egress.egress_port_meter");
 
-
-
-
-
 }
+

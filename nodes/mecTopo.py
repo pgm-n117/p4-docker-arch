@@ -6,6 +6,10 @@ from .p4_mininet import P4Host
 
 import os
 
+common_docker_kwargs={
+    'network_mode':'bridge'
+}
+
 
 class MECTopo(Containernet):
     "A MEC test topology of N network nodes (docker P4 containers) and M host nodes (i.e.: P4Host nodes)"
@@ -73,8 +77,13 @@ class MECTopo(Containernet):
                                     privileged=True, 
                                     cgroup_parent="docker.slice",
                                     controllerAddress=self.controllerAddress,
+                                    intApplication = "org.onosproject.inbandtelemetry", 
+                                    **common_docker_kwargs,
+                                    pipeconf="org.onosproject.pipelines.intmd"
+                                    #pipeconf="org.onosproject.pipelines.basic"
+                                    )
                                     #use 2 cpus from a total of 12, and the next 2 cpus for the next switch
-                                    cpuset_cpus=str(index*2)+","+str(index*2+1))
+                                    #cpuset_cpus=str(index*2)+","+str(index*2+1))
                                     #cpuset_cpus=str(index)) #TODO: CHECK AND QUIT THIS
             
         for index,switch in enumerate(topology['spine_switches']):
@@ -84,7 +93,12 @@ class MECTopo(Containernet):
                                     volumes=[f"{os.getcwd()}:/bmv2"], 
                                     privileged=True, 
                                     cgroup_parent="docker.slice",
-                                    controllerAddress=self.controllerAddress)
+                                    controllerAddress=self.controllerAddress,
+                                    intApplication = "org.onosproject.inbandtelemetry",
+                                    **common_docker_kwargs,
+                                    pipeconf="org.onosproject.pipelines.intmd"
+                                    #pipeconf="org.onosproject.pipelines.basic"
+                                    )
         
         for link in topology['leaf_links']:
             self.addLink(link[0], link[1], cls=Link)

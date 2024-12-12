@@ -67,7 +67,7 @@ import urllib
 
 DEFAULT_NODE_ID = 1
 DEFAULT_CPU_PORT = 255
-DEFAULT_PIPECONF = "org.onosproject.pipelines.int"
+#DEFAULT_PIPECONF = "org.onosproject.pipelines.int" #Onos pipeline app ID: "org.onosproject.pipelines.basic"
 
 STRATUM_BMV2 = 'stratum_bmv2'
 STRATUM_INIT_PIPELINE = '/root/dummy.json'
@@ -77,6 +77,18 @@ BMV2_LOG_LINES = 5
 ONOS_WEB_USER = "onos"
 ONOS_WEB_PASS = "rocks"
 CONTROLLER_STRATUM_PORT = 50001
+INTCONFIG = {
+  "collectorIp": "172.17.0.3",
+  "collectorPort": 32766,
+  "minFlowHopLatencyChangeNs": 32,
+  "watchSubnets": [
+    "0.0.0.0/0",
+    "192.168.10.0/24",
+    "192.168.20.0/24",
+    "10.0.0.0/24"
+  ]
+}
+
 
 
 #TODO finnish docker implementation
@@ -125,7 +137,8 @@ class StratumBmv2DockerSwitch(DockerSwitch):
 
     def __init__(self, name, json=STRATUM_INIT_PIPELINE, loglevel="warn",
                  cpuport=DEFAULT_CPU_PORT, 
-                 pipeconf=DEFAULT_PIPECONF,
+                 pipeconf=None,
+                 intApplication=None,
                  onosdevid=None, 
                  adminstate=True, 
                  grpcPort=CONTROLLER_STRATUM_PORT,
@@ -167,7 +180,7 @@ class StratumBmv2DockerSwitch(DockerSwitch):
         # this as a signal to terminate the switch instance (if active).
         self.keepaliveFile = '/tmp/%s-watchdog.out' % self.name
         self.adminState = "ENABLED" if adminstate else "DISABLED"
-        
+        self.intApplication = intApplication
         self.controllerAddress = controllerAddress
 
         # Make a tmp directory for this switch
@@ -183,8 +196,10 @@ class StratumBmv2DockerSwitch(DockerSwitch):
             "managementAddress": "grpc://%s:%d?device_id=%d" % (
                 srcIP, self.grpcPort, self.nodeId),
             "driver": "stratum-bmv2",
-            "pipeconf": self.pipeconfId
+            #"pipeconf": self.pipeconfId
         }
+        if self.pipeconfId is not None:
+            basicCfg["pipeconf"] = self.pipeconfId
 
         if self.longitude and self.latitude:
             basicCfg["longitude"] = self.longitude
@@ -214,6 +229,7 @@ class StratumBmv2DockerSwitch(DockerSwitch):
 
         return cfgData
     
+    
     def doOnosNetcfg(self, controllerIP):
         """
         From ONOS BMV2 switch example. https://github.com/opennetworkinglab/onos/blob/dd5172e5a6e1ba5c7e17e2f497aa8c27a1ed33e9/tools/dev/mininet/bmv2.py
@@ -233,8 +249,18 @@ class StratumBmv2DockerSwitch(DockerSwitch):
         cfgData = {
             "devices": {
                 self.onosDeviceId: self.getDeviceConfig(srcIP)
-            }
+            },
         }
+
+
+        #TODO: This should be done only once, not for every switch, but it is ok for now
+        if self.intApplication is not None:
+            print("Including INT application in the configuration")
+            cfgData["apps"] = {
+                self.intApplication: {
+                    "report": INTCONFIG
+                }
+            }
 
         self.cmd("echo '"+json.dumps(cfgData, indent=4)+"' > "+self.netcfgFile)
 
