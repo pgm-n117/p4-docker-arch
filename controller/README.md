@@ -21,7 +21,7 @@ docker run -d \
 
 The basic structure of an ONOS application can be created using the ONOS command:
 ```
-onos-create-app app
+onos-create-app bundle <appName>
 ```
 This will create a directory with the basic structure of an ONOS application, including the pom.xml file, the main Java class and the test class. The app name must be a valid Java package name, and must be unique in the ONOS controller.
 **Avoid using "-" characters in the app name, as it can cause errors.**

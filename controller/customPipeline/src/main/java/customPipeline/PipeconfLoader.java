@@ -37,14 +37,14 @@ public final class PipeconfLoader {
     //Different INT variation pipelines from github: https://github.com/mandaryoshi/p4-int
 
     //INT-MD
-    private static final PiPipeconfId INTMD_PIPECONF_ID = new PiPipeconfId("org.onosproject.pipelines.intmd"); //TODO:complete name of the pipeline
+    private static final PiPipeconfId INTMD_PIPECONF_ID = new PiPipeconfId("org.onosproject.pipelines.intmd");
     private static final String INTMD_JSON_PATH = "/p4c-out/bmv2/int_md_2_1_stratum.json";
     private static final String INTMD_P4INFO_PATH = "/p4c-out/bmv2/int_md_2_1_stratum_p4info.txt";
     private static final PiPipeconf INTMD_PIPECONF =buildIntMDPipeconf();
 
 
     //INT-XD
-    private static final PiPipeconfId INTXD_PIPECONF_ID = new PiPipeconfId("org.onosproject.pipelines.intxd"); //TODO:complete name of the pipeline
+    private static final PiPipeconfId INTXD_PIPECONF_ID = new PiPipeconfId("org.onosproject.pipelines.intxd"); //TODO:complete file names of the pipeline
     private static final String INTXD_JSON_PATH = "xxx.json";
     private static final String INTXD_P4INFO_PATH = "xxx_p4info.txt";
     private static final PiPipeconf INTXD_PIPECONF = buildIntXDPipeconf();
@@ -52,7 +52,7 @@ public final class PipeconfLoader {
 
 
     //INT-MX
-    private static final PiPipeconfId INTMX_PIPECONF_ID = new PiPipeconfId("org.onosproject.pipelines.intmx"); //TODO:complete name of the pipeline
+    private static final PiPipeconfId INTMX_PIPECONF_ID = new PiPipeconfId("org.onosproject.pipelines.intmx"); //TODO:complete file names of the pipeline
     private static final String INTMX_JSON_PATH = "xxx.json";
     private static final String INTMX_P4INFO_PATH = "xxx_p4info.txt";
     private static final PiPipeconf INTMX_PIPECONF = buildIntMXPipeconf();

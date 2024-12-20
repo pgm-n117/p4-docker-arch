@@ -18,57 +18,52 @@ package org.mecp4.app;
 
 
 
-import com.fasterxml.jackson.databind.introspect.TypeResolutionContext;
+import com.google.common.collect.ImmutableMap;
+import com.google.errorprone.annotations.Immutable;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.onlab.graph.ScalarWeight;
-import org.onlab.graph.Weight;
 import org.onlab.packet.*;
 import org.onosproject.cfg.ComponentConfigService;
 import org.onosproject.net.*;
+
+import org.onosproject.net.behaviour.inbandtelemetry.IntDeviceConfig;
+import org.onosproject.net.behaviour.inbandtelemetry.IntProgrammable;
+import org.onosproject.net.config.NetworkConfigService;
+import org.onosproject.net.device.DeviceService;
 import org.onosproject.net.flow.*;
+import org.onosproject.net.flow.criteria.Criterion;
+import org.onosproject.net.flow.criteria.Criterion.Type;
+import org.onosproject.net.pi.model.*;
+import org.onosproject.store.service.*;
 import org.osgi.service.component.ComponentContext;
 import org.osgi.service.component.annotations.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-import org.onlab.packet.*;
-import org.onlab.graph.Weight;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
 import org.onosproject.net.flow.criteria.PiCriterion;
-import org.onosproject.net.host.HostEvent;
-import org.onosproject.net.host.HostListener;
 import org.onosproject.net.host.HostService;
 import org.onosproject.net.edge.EdgePortService;
-import org.onosproject.net.pi.model.PiActionId;
-import org.onosproject.net.pi.model.PiActionParamId;
-import org.onosproject.net.pi.model.PiMatchFieldId;
-import org.onosproject.net.pi.model.PiTableId;
 import org.onosproject.net.pi.runtime.PiAction;
 import org.onosproject.net.pi.runtime.PiActionParam;
-import org.onosproject.net.topology.Topology;
 import org.onosproject.net.topology.TopologyService;
-
 import org.onosproject.net.packet.*;
 
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.IntBuffer;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.onosproject.net.pi.service.*;
-import org.onosproject.net.pi.model.*;
 import org.onosproject.net.pi.runtime.*;
 
 
 import java.util.Optional;
 
-import org.mecp4.app.BasicPipelineConstants.*;
 import static java.nio.ByteBuffer.wrap;
+
 
 
 /**
@@ -99,7 +94,11 @@ public class P4Routing implements P4RoutingInterface{
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected FlowRuleService flowRuleService;
 
+    @Reference(cardinality = ReferenceCardinality.MANDATORY)
+    protected DeviceService deviceService;
 
+    @Reference(cardinality = ReferenceCardinality.MANDATORY)
+    protected StorageService storageService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected TopologyService topologyService;
@@ -114,8 +113,7 @@ public class P4Routing implements P4RoutingInterface{
     protected PiPipeconfService piPipeconfService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
-    protected PiTranslationService piTranslationService;
-
+    protected NetworkConfigService netcfgService;
 
     //--------------------------------------------------------------------------
     //--------------------------------------------------------------------------
@@ -128,6 +126,8 @@ public class P4Routing implements P4RoutingInterface{
     //Packet Processor
     private PacketProcessor mecP4packetProcessor;
     private ApplicationId appId;
+
+    private PipeconfListener pipeconfListener = new PipeconfListener();
 
     private ConcurrentMap<Link, Double> ActiveLinks = new ConcurrentHashMap<>(); //Links and their usage by active paths (times used by a flowrule) -> for load balancing
     private Object LinksMutex = new Object();
@@ -147,15 +147,51 @@ public class P4Routing implements P4RoutingInterface{
             mecP4packetProcessor = new appPacketProcessor();
             packetService.addProcessor(mecP4packetProcessor, PacketProcessor.director(3));
 
+            //IntReportConfig reportConfig = new IntReportConfig();
+            //reportConfig.setCollectorIp(IpAddress.valueOf("172.0.0.1"));
+            //reportConfig.setCollectorPort(TpPort.tpPort(54321));
+
+            piPipeconfService.addListener(pipeconfListener);
+
+            IntDeviceConfig intconfig = new IntDeviceConfig.Builder().
+                    withCollectorIp(IpAddress.valueOf("172.0.0.1")).
+                    withCollectorPort(TpPort.tpPort(54321)).
+                    enabled(true).
+                    build();
+
+            netcfgService.getSubjectClasses().forEach(subjectClass -> {
+                netcfgService.getSubjects(subjectClass).forEach(subject -> {
+                    netcfgService.getConfigs(subject).forEach(config -> {
+                        log.info("NETCFG SUBJECT CONFIG: "+config.toString());
+                    });
+                });
+            });
+
+
+
+
             //log.info(edgePortService.getEdgePoints().toString());
 
             edgePortService.getEdgePoints().forEach(connectPoint -> {
-                log.info("EDGE DEVICE: " + connectPoint.deviceId());
+
+                //log.info("EDGE DEVICE: " + connectPoint.deviceId().toString() + " - INT Capable?: " + deviceService.getDevice(connectPoint.deviceId()).is(IntProgrammable.class));
+                log.info("EDGE DEVICE: " + connectPoint.deviceId().toString());
+
+                Device device = deviceService.getDevice(connectPoint.deviceId());
+                if (device.is(IntProgrammable.class)) {
+                    IntProgrammable intdevice = deviceService.getDevice(connectPoint.deviceId()).as(IntProgrammable.class);
+                    intdevice.setupIntConfig(intconfig);
+                    intdevice.setSourcePort(PortNumber.portNumber(1));
+                    intdevice.setSinkPort(PortNumber.portNumber(2));
+
+                }
 
                 packetService.requestPackets(DefaultTrafficSelector.builder().matchEthType(Ethernet.TYPE_ARP).build(), PacketPriority.REACTIVE, appId, Optional.of(connectPoint.deviceId()));
                 //IPV4
                 packetService.requestPackets(DefaultTrafficSelector.builder().matchEthType(Ethernet.TYPE_IPV4).build(), PacketPriority.REACTIVE, appId, Optional.of(connectPoint.deviceId()));
+
             });
+
 
             log.info(APP_NAME + " Started");
 
@@ -180,6 +216,8 @@ public class P4Routing implements P4RoutingInterface{
                 //packetService.cancelPackets(DefaultTrafficSelector.builder().matchUdpDst(TpPort.tpPort(7777)).build(), PacketPriority.HIGH, appId, Optional.of(connectPoint.deviceId()));
             });
 
+
+            piPipeconfService.removeListener(pipeconfListener);
             flowRuleService.removeFlowRulesById(appId);
             packetService.removeProcessor(mecP4packetProcessor);
             log.info(APP_NAME + " Stopped");
@@ -408,10 +446,12 @@ public class P4Routing implements P4RoutingInterface{
                     });
 
                     //Install flowrule on last device (redirect to host)
-                    installPathFlowRule(dstHost.location(), OutputDevicePort, dstMac, protocol, srcIp, srcIpPort, dstIp, dstIpPort);
+                    //installPathFlowRule(dstHost.location(), protocol, dstMac, srcIp, srcIpPort, dstIp, dstIpPort);
+                    installLastHopFlowRule(dstHost.location(), dstMac);
 
                     //Install flowrule on last device of reverse path
-                    installPathFlowRule(context.inPacket().receivedFrom(), InputDevicePort, dstMac, protocol, dstIp, dstIpPort, srcIp, srcIpPort);
+                    //installPathFlowRule(context.inPacket().receivedFrom(), protocol, context.inPacket().parsed().getSourceMAC(), dstIp, dstIpPort, srcIp, srcIpPort);
+                    installLastHopFlowRule(context.inPacket().receivedFrom(), context.inPacket().parsed().getSourceMAC());
 
 
                 } else {
@@ -424,9 +464,91 @@ public class P4Routing implements P4RoutingInterface{
             }
         }
 
-        //Install path flowrule for specific device output -> for links from paths
+
+        /*
+        Installs last hop flowrule to redirect traffic to a host connected to a switch, assuming Ethernet type traffic.
+         */
+        private FlowRule installLastHopFlowRule(ConnectPoint dstConnectionPoint, MacAddress dstMac) //,
+                                                //Ip4Address srcIp, int srcIpPort, Ip4Address dstIp, int dstIpPort)
+        {
+            TrafficSelector.Builder selector;
+
+            TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder().setOutput(dstConnectionPoint.port());
+
+            selector = DefaultTrafficSelector.builder().
+                    matchEthDst(dstMac);
+
+
+
+            FlowRule.Builder flowrule = DefaultFlowRule.builder().
+                    forTable(0).
+                    withSelector(selector.build()).
+                    withTreatment(treatment.build()).
+                    fromApp(appId).
+                    forDevice(dstConnectionPoint.deviceId()).
+                    withPriority(PacketPriority.MEDIUM.priorityValue()).
+                    withIdleTimeout(10);
+
+
+            FlowRule installFlowrule = flowrule.build();
+
+            flowRuleService.applyFlowRules(flowrule.build());
+            return installFlowrule;
+
+        }
+
+        /*
+        Installs flowrules on a ConnectPoint (a network device), for a given L4 traffic flow (src ip:port, dst ip:port)
+        Can be used to install last hop flowrules to redirect traffic to a host connected to a switch distinguishing
+        by L4 match fields.
+         */
         private FlowRule installPathFlowRule(ConnectPoint dstConnectionPoint, byte protocol, Ip4Address srcIp, int srcIpPort,
+                                             Ip4Address dstIp, int dstIpPort){
+
+
+            TrafficSelector.Builder selector;
+            TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder().setOutput(dstConnectionPoint.port());
+            selector = DefaultTrafficSelector.builder().
+                    matchEthType(Ethernet.TYPE_IPV4).
+                    matchIPSrc(srcIp.toIpPrefix()).
+                    matchIPDst(dstIp.toIpPrefix()).
+                    matchIPProtocol(protocol);
+            //We assume that TCP and UDP are equally mapped on the custom P4 pipeline (L4 src and dst ports).
+            //However, lets try to write things correctly.
+            switch(protocol){
+                case IPv4.PROTOCOL_TCP:
+                    selector.matchTcpSrc(TpPort.tpPort(srcIpPort)).
+                            matchTcpDst(TpPort.tpPort(dstIpPort));
+                    break;
+                case IPv4.PROTOCOL_UDP:
+                    selector.matchUdpSrc(TpPort.tpPort(srcIpPort)).
+                            matchUdpDst(TpPort.tpPort(dstIpPort));
+                    break;
+                default:
+                    break;
+            }
+
+
+            FlowRule.Builder flowrule = DefaultFlowRule.builder().
+                    forTable(0).
+                    withSelector(selector.build()).
+                    withTreatment(treatment.build()).
+                    fromApp(appId).
+                    forDevice(dstConnectionPoint.deviceId()).
+                    withPriority(PacketPriority.MEDIUM.priorityValue()).
+                    withIdleTimeout(10);
+
+
+            FlowRule installFlowrule = flowrule.build();
+
+            flowRuleService.applyFlowRules(flowrule.build());
+            return installFlowrule;
+        }
+
+        //Install path flowrule for specific device output -> for links from paths
+        private FlowRule installBasicPipelinePathFlowRule(ConnectPoint dstConnectionPoint, byte protocol, Ip4Address srcIp, int srcIpPort,
                                              Ip4Address dstIp, int dstIpPort) {
+
 
 
             PiCriterion.Builder piMatchCriterion = PiCriterion.builder();
@@ -438,10 +560,10 @@ public class P4Routing implements P4RoutingInterface{
                     matchTernary(BasicPipelineConstants.HDR_HDR_IPV4_DST_ADDR, dstIp.toOctets(), Ip4Address.valueOf("255.255.255.255").toOctets());
 
 
-
-
             if(protocol == IPv4.PROTOCOL_ICMP){
                 piMatchCriterion.matchTernary(BasicPipelineConstants.HDR_HDR_IPV4_PROTOCOL, protocol, IPv4.PROTOCOL_ICMP);
+
+
             }else if (protocol == IPv4.PROTOCOL_TCP || protocol == IPv4.PROTOCOL_UDP){
                 piMatchCriterion.
                         //match exact ports from UDP or TCP
@@ -465,28 +587,25 @@ public class P4Routing implements P4RoutingInterface{
             TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder().piTableAction(table0_egress_port);
 
 
-
             //FlowRule
             FlowRule.Builder flowrule = DefaultFlowRule.builder().
-                    forTable(PiTableId.of("ingress.table0_control.table0")).
+                    forTable(0).
                     withSelector(piSelector.build()).
                     withTreatment(treatment.build()).
                     fromApp(appId).
                     forDevice(dstConnectionPoint.deviceId()).
-                    withPriority(PacketPriority.MEDIUM.priorityValue()).withIdleTimeout(10);
-                    //makeTemporary(10);
+                    withPriority(PacketPriority.MEDIUM.priorityValue()).
+                    withIdleTimeout(10);
 
-
-            //Apply rule - test this:
             FlowRule installFlowrule = flowrule.build();
-            //Apply rule - test this:
-            log.info("NEW FLOWRULE:" + installFlowrule.toString());
+
             flowRuleService.applyFlowRules(flowrule.build());
+
             return installFlowrule;
         }
 
         //Install path flowrule for specific device output port and destination mac -> for initial or destination devices
-        private void installPathFlowRule(ConnectPoint dstConnectionPoint, PortNumber outputPort, MacAddress dstMac, byte protocol,
+        private void installBasicPipelinePathFlowRule(ConnectPoint dstConnectionPoint, PortNumber outputPort, MacAddress dstMac, byte protocol,
                                          Ip4Address srcIp, int srcIpPort, Ip4Address dstIp, int dstIpPort) {
 
             PiCriterion.Builder piMatchCriterion = PiCriterion.builder();
@@ -522,21 +641,21 @@ public class P4Routing implements P4RoutingInterface{
 
             TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder().piTableAction(table0_egress_port);
 
+
             //FlowRule
             FlowRule.Builder flowrule = DefaultFlowRule.builder().
-                    forTable(PiTableId.of("ingress.table0_control.table0")).
+                    forTable(0).
                     withSelector(piSelector.build()).
                     withTreatment(treatment.build()).
                     fromApp(appId).
                     forDevice(dstConnectionPoint.deviceId()).
-                    withPriority(PacketPriority.MEDIUM.priorityValue()).withIdleTimeout(10);
-                    //makeTemporary(10);
+                    withPriority(PacketPriority.MEDIUM.priorityValue()).
+                    withIdleTimeout(10);
 
 
             //Apply rule - test this:
             FlowRule installFlowrule = flowrule.build();
-            //Apply rule - test this:
-            log.info("NEW FLOWRULE:" + installFlowrule.toString());
+
             flowRuleService.applyFlowRules(flowrule.build());
         }
 
@@ -573,8 +692,6 @@ public class P4Routing implements P4RoutingInterface{
             } else {
                 return defPath;
             }
-
-
         }
 
         private Path selectBalancedPaths(Set<Path> paths, PortNumber inputDevicePort) {
@@ -619,8 +736,12 @@ public class P4Routing implements P4RoutingInterface{
         }
 
 
+        /*
+         I don't think that the packet is actually dropping in the controller with this, but at least the management
+         of the packet finishes here.
+         */
         private void dropPacket(PacketContext context) {
-            context.treatmentBuilder().drop();
+            context.treatmentBuilder().drop().build();
         }
 
 
@@ -634,20 +755,16 @@ public class P4Routing implements P4RoutingInterface{
                 Thread.sleep(100);
             } catch (InterruptedException ignored) {
             }
-
             ConnectPoint receivedFrom = context.inPacket().receivedFrom();
-            PiActionParamId PORT = PiActionParamId.of("port");
-            PiTableAction table0_egress_port = PiAction.builder().withId(PiActionId.of("ingress.table0_control.set_egress_port")).withParameter(new PiActionParam(PORT, context.inPacket().receivedFrom().port().toLong())).build();
 
             TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder().setOutput(receivedFrom.port());
-
-
 
             packetService.emit(new DefaultOutboundPacket(
                     context.inPacket().receivedFrom().deviceId(),
                     treatment.build(),
                     context.inPacket().unparsed()));
         }
+
     }
 
 }

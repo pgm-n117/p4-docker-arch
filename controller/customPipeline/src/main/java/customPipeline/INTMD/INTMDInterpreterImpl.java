@@ -2,16 +2,14 @@ package customPipeline.INTMD;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import customPipeline.CustomConstants;
+
 import org.onlab.packet.DeserializationException;
-import org.onlab.packet.EthType;
 import org.onlab.packet.Ethernet;
 import org.onlab.util.ImmutableByteSequence;
 import org.onosproject.net.ConnectPoint;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.Port;
 import org.onosproject.net.PortNumber;
-import org.onosproject.net.PortNumber.*;
 
 import static org.onlab.util.ImmutableByteSequence.copyFrom;
 import static org.onosproject.net.PortNumber.Logical.FLOOD;
@@ -21,7 +19,6 @@ import org.onosproject.net.driver.AbstractHandlerBehaviour;
 import org.onosproject.net.flow.TrafficTreatment;
 import org.onosproject.net.flow.criteria.Criterion;
 import org.onosproject.net.flow.instructions.Instruction;
-import org.onosproject.net.flow.instructions.Instructions.*;
 
 import static java.util.stream.Collectors.toList;
 
@@ -35,10 +32,7 @@ import org.onosproject.net.pi.model.PiActionId;
 import org.onosproject.net.pi.model.PiMatchFieldId;
 import org.onosproject.net.pi.model.PiPipelineInterpreter;
 import org.onosproject.net.pi.model.PiTableId;
-import org.onosproject.net.pi.runtime.PiAction;
-import org.onosproject.net.pi.runtime.PiActionParam;
-import org.onosproject.net.pi.runtime.PiPacketMetadata;
-import org.onosproject.net.pi.runtime.PiPacketOperation;
+import org.onosproject.net.pi.runtime.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,7 +49,7 @@ import static org.onosproject.net.PortNumber.CONTROLLER;
 import static org.onosproject.net.pi.model.PiPacketOperationType.PACKET_OUT;
 
 public class INTMDInterpreterImpl extends AbstractHandlerBehaviour
-        implements PiPipelineInterpreter {
+        implements PiPipelineInterpreter{
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -71,6 +65,7 @@ public class INTMDInterpreterImpl extends AbstractHandlerBehaviour
                     .put(Criterion.Type.ETH_DST, HDR_ETHERNET_DST_ADDR)
                     .put(Criterion.Type.ETH_SRC, HDR_ETHERNET_SRC_ADDR)
                     .put(Criterion.Type.ETH_TYPE, HDR_ETHERNET_ETHER_TYPE)
+                    .put(Criterion.Type.IP_PROTO, HDR_IPV4_PROTOCOL)
                     .put(Criterion.Type.IPV4_SRC, HDR_IPV4_SRC_ADDR)
                     .put(Criterion.Type.IPV4_DST, HDR_IPV4_DST_ADDR)
                     .put(Criterion.Type.TCP_SRC, HDR_LOCAL_METADATA_L4_SRC_PORT)
@@ -82,6 +77,7 @@ public class INTMDInterpreterImpl extends AbstractHandlerBehaviour
 
     @Override
     public Optional<PiMatchFieldId> mapCriterionType(Criterion.Type type) {
+        log.debug("Mapping criterion type: "+type+" on INTMDInterpreter");
         return Optional.ofNullable(CRITERION_MAP.get(type));
     }
 
@@ -99,7 +95,7 @@ public class INTMDInterpreterImpl extends AbstractHandlerBehaviour
 
     @Override
     public PiAction mapTreatment(TrafficTreatment treatment, PiTableId piTableId) throws PiInterpreterException {
-
+        log.debug("Mapping traffic treatment: "+treatment.toString()+" for table "+ piTableId +" on INTMDInterpreter");
         if (treatment.allInstructions().isEmpty()){
             //No actions on treatment: drop
             //Don't get why use table0 drop action if no table is specified (no instructions)
@@ -112,6 +108,7 @@ public class INTMDInterpreterImpl extends AbstractHandlerBehaviour
         switch (instruction.type()) {
             case OUTPUT:
                 if (piTableId.equals(TABLE0)){
+                    log.debug("Mapping OUTPUT instruction: "+instruction.toString()+" on INTMDInterpreter");
                     return outputPiAction((OutputInstruction) instruction, INGRESS_TABLE0_SET_EGRESS_PORT);
                 } //else if piTableId corresponds to another implemented table, set action
                 else {
@@ -211,7 +208,7 @@ public class INTMDInterpreterImpl extends AbstractHandlerBehaviour
     public InboundPacket mapInboundPacket(PiPacketOperation packetOperation, DeviceId deviceId) throws PiPipelineInterpreter.PiInterpreterException {
         // Assuming that the packet is ethernet, which is fine since basic.p4
         // can deparse only ethernet packets.
-        log.info("MAPPING INBOUND PACKET __");
+        //log.info("MAPPING INBOUND PACKET __");
         Ethernet ethPkt;
         try {
 
@@ -221,8 +218,8 @@ public class INTMDInterpreterImpl extends AbstractHandlerBehaviour
             log.error("Deserialization error", dex);
             throw new PiInterpreterException(dex.getMessage());
         }
-        log.info("GETTING PACKET METADATA");
-        log.info(ethPkt.toString());
+        //log.info("GETTING PACKET METADATA");
+        //log.info(ethPkt.toString());
         // Returns the ingress port packet metadata.
         Optional<PiPacketMetadata> packetMetadata = packetOperation.metadatas()
                 .stream().filter(m -> m.id().equals(INGRESS_PORT))
@@ -240,6 +237,7 @@ public class INTMDInterpreterImpl extends AbstractHandlerBehaviour
                     INGRESS_PORT, deviceId, packetOperation));
         }
     }
+
 
     /* Not necessary functions at this moment
 
