@@ -28,12 +28,19 @@ import org.onosproject.net.*;
 
 import org.onosproject.net.behaviour.inbandtelemetry.IntDeviceConfig;
 import org.onosproject.net.behaviour.inbandtelemetry.IntProgrammable;
+//import org.onosproject.net.behaviour.inbandtelemetry.IntReportConfig;
 import org.onosproject.net.config.NetworkConfigService;
+import org.onosproject.net.device.DeviceEvent;
+import org.onosproject.net.device.DeviceListener;
 import org.onosproject.net.device.DeviceService;
+import org.onosproject.net.edge.EdgePortEvent;
+import org.onosproject.net.edge.EdgePortListener;
 import org.onosproject.net.flow.*;
 import org.onosproject.net.flow.criteria.Criterion;
 import org.onosproject.net.flow.criteria.Criterion.Type;
 import org.onosproject.net.pi.model.*;
+import org.onosproject.net.topology.TopologyEvent;
+import org.onosproject.net.topology.TopologyListener;
 import org.onosproject.store.service.*;
 import org.osgi.service.component.ComponentContext;
 import org.osgi.service.component.annotations.*;
@@ -53,6 +60,7 @@ import org.onosproject.net.packet.*;
 
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -106,6 +114,7 @@ public class P4Routing implements P4RoutingInterface{
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected EdgePortService edgePortService;
 
+
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected HostService hostService;
 
@@ -128,11 +137,15 @@ public class P4Routing implements P4RoutingInterface{
     private ApplicationId appId;
 
     private PipeconfListener pipeconfListener = new PipeconfListener();
+    //private DeviceListener deviceListener = new deviceEventListener();
+    private EdgePortListener edgePortListener = new edgePortListener();
 
     private ConcurrentMap<Link, Double> ActiveLinks = new ConcurrentHashMap<>(); //Links and their usage by active paths (times used by a flowrule) -> for load balancing
     private Object LinksMutex = new Object();
     private ConcurrentMap<FlowId, Link> ActiveFlowrules = new ConcurrentHashMap<>(); //Active flowrules (id) and the link its using
     private Object FlowRuleMutex = new Object();
+    //private ConcurrentSkipListSet<Device> ConfiguredNetDevices = new ConcurrentSkipListSet<>();
+    private ConcurrentMap<Device, Boolean> ConfiguredEdgeNetDevices = new ConcurrentHashMap<>(); //Boolean value: True if device has been added during app init, False if device has been added by edge port event
 
     @Activate
     protected void activate() {
@@ -152,13 +165,11 @@ public class P4Routing implements P4RoutingInterface{
             //reportConfig.setCollectorPort(TpPort.tpPort(54321));
 
             piPipeconfService.addListener(pipeconfListener);
+            //deviceService.addListener(deviceListener);
+            edgePortService.addListener(edgePortListener);
 
-            IntDeviceConfig intconfig = new IntDeviceConfig.Builder().
-                    withCollectorIp(IpAddress.valueOf("172.0.0.1")).
-                    withCollectorPort(TpPort.tpPort(54321)).
-                    enabled(true).
-                    build();
 
+            //Show each device netcfg
             netcfgService.getSubjectClasses().forEach(subjectClass -> {
                 netcfgService.getSubjects(subjectClass).forEach(subject -> {
                     netcfgService.getConfigs(subject).forEach(config -> {
@@ -168,27 +179,21 @@ public class P4Routing implements P4RoutingInterface{
             });
 
 
-
-
-            //log.info(edgePortService.getEdgePoints().toString());
-
             edgePortService.getEdgePoints().forEach(connectPoint -> {
 
                 //log.info("EDGE DEVICE: " + connectPoint.deviceId().toString() + " - INT Capable?: " + deviceService.getDevice(connectPoint.deviceId()).is(IntProgrammable.class));
                 log.info("EDGE DEVICE: " + connectPoint.deviceId().toString());
 
                 Device device = deviceService.getDevice(connectPoint.deviceId());
-                if (device.is(IntProgrammable.class)) {
-                    IntProgrammable intdevice = deviceService.getDevice(connectPoint.deviceId()).as(IntProgrammable.class);
-                    intdevice.setupIntConfig(intconfig);
-                    intdevice.setSourcePort(PortNumber.portNumber(1));
-                    intdevice.setSinkPort(PortNumber.portNumber(2));
 
+
+                if(!ConfiguredEdgeNetDevices.containsKey(device)){
+                    InitEdgeTrafficSelector(connectPoint.deviceId());
                 }
 
-                packetService.requestPackets(DefaultTrafficSelector.builder().matchEthType(Ethernet.TYPE_ARP).build(), PacketPriority.REACTIVE, appId, Optional.of(connectPoint.deviceId()));
-                //IPV4
-                packetService.requestPackets(DefaultTrafficSelector.builder().matchEthType(Ethernet.TYPE_IPV4).build(), PacketPriority.REACTIVE, appId, Optional.of(connectPoint.deviceId()));
+                IntNetCFGStartUp(device);
+
+                ConfiguredEdgeNetDevices.put(device, true);
 
             });
 
@@ -200,6 +205,8 @@ public class P4Routing implements P4RoutingInterface{
         }
     }
 
+
+
     @Deactivate
     protected void deactivate() {
 
@@ -209,11 +216,12 @@ public class P4Routing implements P4RoutingInterface{
 
             //Remove everything initialized on activate
             edgePortService.getEdgePoints().forEach(connectPoint -> {
-                //ARP
-                packetService.cancelPackets(DefaultTrafficSelector.builder().matchEthType(Ethernet.TYPE_ARP).build(), PacketPriority.REACTIVE, appId, Optional.of(connectPoint.deviceId()));
-                //IPV4
-                packetService.cancelPackets(DefaultTrafficSelector.builder().matchEthType(Ethernet.TYPE_IPV4).build(), PacketPriority.REACTIVE, appId, Optional.of(connectPoint.deviceId()));
-                //packetService.cancelPackets(DefaultTrafficSelector.builder().matchUdpDst(TpPort.tpPort(7777)).build(), PacketPriority.HIGH, appId, Optional.of(connectPoint.deviceId()));
+
+                StopEdgeTrafficSelector(connectPoint.deviceId());
+
+                IntNetCFGStop(deviceService.getDevice(connectPoint.deviceId()));
+
+                ConfiguredEdgeNetDevices.remove(deviceService.getDevice(connectPoint.deviceId()));
             });
 
 
@@ -237,6 +245,65 @@ public class P4Routing implements P4RoutingInterface{
 
         log.info("Reconfigured");
     }
+
+
+    private void InitEdgeTrafficSelector(DeviceId deviceId) {
+        log.info("Configuring traffic selector on device: " + deviceId.toString());
+        //ARP traffic selector
+        packetService.requestPackets(DefaultTrafficSelector.builder().matchEthType(Ethernet.TYPE_ARP).build(), PacketPriority.REACTIVE, appId, Optional.of(deviceId));
+        //IPV4 traffic selector
+        packetService.requestPackets(DefaultTrafficSelector.builder().matchEthType(Ethernet.TYPE_IPV4).build(), PacketPriority.REACTIVE, appId, Optional.of(deviceId));
+    }
+
+    private void StopEdgeTrafficSelector(DeviceId deviceId) {
+        log.info("Stopping traffic selector on device: " + deviceId.toString());
+        //ARP
+        packetService.cancelPackets(DefaultTrafficSelector.builder().matchEthType(Ethernet.TYPE_ARP).build(), PacketPriority.REACTIVE, appId, Optional.of(deviceId));
+        //IPV4
+        packetService.cancelPackets(DefaultTrafficSelector.builder().matchEthType(Ethernet.TYPE_IPV4).build(), PacketPriority.REACTIVE, appId, Optional.of(deviceId));
+        //packetService.cancelPackets(DefaultTrafficSelector.builder().matchUdpDst(TpPort.tpPort(7777)).build(), PacketPriority.HIGH, appId, Optional.of(connectPoint.deviceId()));
+    }
+
+
+    private void IntNetCFGStartUp(Device device){
+        if (device.is(IntProgrammable.class)) {
+            //    IntProgrammable intdevice = deviceService.getDevice(connectPoint.deviceId()).as(IntProgrammable.class);
+
+
+            //    intdevice.setupIntConfig(intconfig);
+            //    intdevice.setSourcePort(PortNumber.portNumber(1));
+            //    intdevice.setSinkPort(PortNumber.portNumber(2));
+            //    /*TODO:  EN NODOS INTERMEDIOS Y TAMBIÉN EN LOS EXTREMOS PARA AÑADIR LAS CABECERAS.
+            //    *  EN LOS INTERMEDIOS NO DEBERÍA HACER FALTA YA QUE TIENEN UNA REGLA POR DEFECTO:
+            //    *  SI EXISTE CABECERA INT, AÑADIR DATOS SEGUN CABECERA DE INSTRUCCIONES
+            //    *  intdevice.addIntObjective();
+            //    */
+        }
+    }
+
+    private void IntNetCFGStop(Device device){
+        if (device.is(IntProgrammable.class)) {
+            //    IntProgrammable intdevice = deviceService.getDevice(connectPoint.deviceId()).as(IntProgrammable.class);
+
+
+            //    intdevice.setupIntConfig(intconfig);
+            //    intdevice.setSourcePort(PortNumber.portNumber(1));
+            //    intdevice.setSinkPort(PortNumber.portNumber(2));
+            //    /*TODO:  EN NODOS INTERMEDIOS Y TAMBIÉN EN LOS EXTREMOS PARA AÑADIR LAS CABECERAS.
+            //    *  EN LOS INTERMEDIOS NO DEBERÍA HACER FALTA YA QUE TIENEN UNA REGLA POR DEFECTO:
+            //    *  SI EXISTE CABECERA INT, AÑADIR DATOS SEGUN CABECERA DE INSTRUCCIONES
+            //    *  intdevice.addIntObjective();
+            //    */
+        }
+    }
+
+
+
+
+
+
+
+
 
     private class appPacketProcessor implements PacketProcessor {
 
@@ -765,6 +832,77 @@ public class P4Routing implements P4RoutingInterface{
                     context.inPacket().unparsed()));
         }
 
+    }
+
+    private class edgePortListener implements EdgePortListener{
+
+
+        @Override
+        public void event(EdgePortEvent event) {
+
+            switch (event.type()) {
+                case EDGE_PORT_ADDED:
+                    if(!ConfiguredEdgeNetDevices.containsKey(deviceService.getDevice(event.subject().deviceId()))){
+                        log.info("EVENT "+event.type().toString()+", Init edge device "+event.subject().deviceId());
+                        InitEdgeTrafficSelector(event.subject().deviceId());
+
+                        ConfiguredEdgeNetDevices.put(deviceService.getDevice(event.subject().deviceId()), false);
+                    }
+                    //IntNetCFGStartUp(event.subject());
+                    break;
+                case EDGE_PORT_REMOVED:
+
+
+                    log.info("EVENT "+event.type().toString()+", Init edge device "+event.subject().deviceId());
+                    StopEdgeTrafficSelector(event.subject().deviceId());
+
+                    ConfiguredEdgeNetDevices.remove(deviceService.getDevice(event.subject().deviceId()));
+
+                    //IntNetCFGStop(event.subject());
+
+                    break;
+            }
+        }
+
+        @Override
+        public boolean isRelevant(EdgePortEvent event) {
+            return EdgePortListener.super.isRelevant(event);
+        }
+    }
+
+
+    private class deviceEventListener implements DeviceListener {
+
+
+        @Override
+        public void event(DeviceEvent event) {
+            switch (event.type()){
+                case DEVICE_ADDED: //new devices added
+                    //Configure traffic selector
+                    break;
+                case DEVICE_REMOVED: //completely removed devices from the control plane
+                    break;
+                case DEVICE_AVAILABILITY_CHANGED: //normally temporary disconnection, net device config is saved when it comes back
+                    break;
+                case DEVICE_SUSPENDED:
+                    break;
+                case DEVICE_UPDATED:
+                    break;
+                case PORT_ADDED:
+                    break;
+                case PORT_REMOVED:
+                    break;
+                //case PORT_STATS_UPDATED: do not treat this case
+                //    break;
+                case PORT_UPDATED: //usually triggered when the port of a net device is being affected by a neighbour, i.e disconnected host or net device
+                    break;
+            }
+        }
+
+        @Override
+        public boolean isRelevant(DeviceEvent event) {
+            return DeviceListener.super.isRelevant(event);
+        }
     }
 
 }
