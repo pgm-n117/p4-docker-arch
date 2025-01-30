@@ -67,8 +67,6 @@ parser MyIngressParser(packet_in packet,
     }
 
     state parse_int_data {
-        //TODO: CHECK THIS Parse INT metadata stack
-        packet.extract(hdr.int_data, ((bit<32>) (local_metadata.int_meta.intl4_shim_len - INT_HEADER_LEN_WORD)) << 5);
         transition accept;
     }
 }
@@ -79,19 +77,39 @@ parser MyIngressParser(packet_in packet,
 ****************  E G R E S S   D E P A R S E R   ************************
 *************************************************************************/
 
-control MyEgressDeparser(packet_out packet, in headers hdr) {
+control MyEgressDeparser(packet_out packet, 
+                         in headers hdr) {
+    
+    //Checksum() ipv4Checksum;
     
     apply {
 
-        packet.emit(hdr.packet_in);
+        //hdr.ipv4.hdr_checksum = ipv4Checksum.update(
+        //     {
+        //        hdr.ipv4.version,
+        //        hdr.ipv4.ihl,
+        //        hdr.ipv4.dscp,
+        //        hdr.ipv4.ecn,
+        //        hdr.ipv4.len,
+        //        hdr.ipv4.identification,
+        //        hdr.ipv4.flags,
+        //        hdr.ipv4.frag_offset,
+        //        hdr.ipv4.ttl,
+        //        hdr.ipv4.protocol,
+        //        hdr.ipv4.src_addr,
+        //        hdr.ipv4.dst_addr
+        //     }
+        // );
 
-        //REPORT HEADERS 
+        //TODO: REPORT HEADERS: If sink node, report headers will be "setValid", so emit will be called succesfully
+        // else, report headers will not exist and will not be emitted. Report headers are followed by the complete original packet
         packet.emit(hdr.report_ethernet);
         packet.emit(hdr.report_ipv4);
         packet.emit(hdr.report_udp);
         packet.emit(hdr.report_group_header);
-
+        
         //Common headers
+        packet.emit(hdr.packet_in);
         packet.emit(hdr.ethernet);
         packet.emit(hdr.ipv4);
         packet.emit(hdr.udp);
@@ -109,7 +127,6 @@ control MyEgressDeparser(packet_out packet, in headers hdr) {
         packet.emit(hdr.int_level2_port_ids);
         packet.emit(hdr.int_egress_tx_util);
 
-        //TODO: CHECK HOW THIS WORKS
         packet.emit(hdr.int_data);
         
     }

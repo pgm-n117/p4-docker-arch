@@ -1,6 +1,7 @@
 control process_int_source_sink (
     inout headers hdr,
     inout local_metadata_t local_metadata,
+    inout standard_metadata_t standard_metadata,
     in ingress_intrinsic_metadata_t ig_intr_md,
     inout ingress_intrinsic_metadata_for_tm_t ig_tm_md) {
 

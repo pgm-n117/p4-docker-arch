@@ -1,18 +1,18 @@
 package customPipeline;
 
 import com.google.common.collect.ImmutableList;
-import com.google.errorprone.annotations.Immutable;
 import customPipeline.INTMD.INTMDInterpreterImpl;
 import customPipeline.INTMD.INTMDPipelinerImpl;
+import customPipeline.INTMD.INTMDProgrammableImpl;
 import customPipeline.INTMX.INTMXInterpreterImpl;
 import customPipeline.INTMX.INTMXPipelinerImpl;
 import customPipeline.INTXD.INTXDInterpreterImpl;
 import customPipeline.INTXD.INTXDPipelinerImpl;
 import org.onosproject.core.CoreService;
 import org.onosproject.net.behaviour.Pipeliner;
+import org.onosproject.net.behaviour.inbandtelemetry.IntProgrammable;
 import org.onosproject.p4runtime.model.P4InfoParser;
 import org.onosproject.p4runtime.model.P4InfoParserException;
-import org.onosproject.net.behaviour.inbandtelemetry.IntProgrammable;
 import org.onosproject.net.device.PortStatisticsDiscovery;
 import org.onosproject.net.pi.model.*;
 import org.onosproject.net.pi.service.PiPipeconfService;
@@ -23,7 +23,6 @@ import org.slf4j.LoggerFactory;
 
 import java.net.URL;
 import java.util.Collection;
-import java.util.List;
 
 
 import static org.onosproject.net.pi.model.PiPipeconf.ExtensionType.BMV2_JSON;
@@ -92,7 +91,7 @@ public final class PipeconfLoader {
                     .addBehaviour(PiPipelineInterpreter.class, INTMDInterpreterImpl.class)
                     .addBehaviour(Pipeliner.class, INTMDPipelinerImpl.class)
                     .addBehaviour(PortStatisticsDiscovery.class, PortStatisticsDiscoveryImpl.class)
-                    //.addBehaviour(IntProgrammable.class, IntProgrammableImpl.class) TODO: DONT KNOW YET ABOUT THIS BEHAVIOUR
+                    .addBehaviour(IntProgrammable.class, INTMDProgrammableImpl.class)
                     .addExtension(P4_INFO_TEXT, p4InfoUrl)
                     .addExtension(BMV2_JSON, jsonUrl)
                     .build();

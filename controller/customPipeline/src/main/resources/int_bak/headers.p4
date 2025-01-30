@@ -21,7 +21,6 @@
 #define _FALSE false
 #endif
 
-
 // 1 --> 2 --> 3 Switch hardware ID
 const bit<6> HW_ID = 1;
 
@@ -60,9 +59,7 @@ const bit<5>  IPV4_OPTION_INT = 31;
 typedef bit<3> mirror_type_t;
 typedef bit<8>  pkt_type_t;
 //
-const bit<32> REPORT_MIRROR_SESSION_ID = 500;
-
-//const mirror_type_t MIRROR_TYPE_I2E = 1;
+const mirror_type_t MIRROR_TYPE_I2E = 1;
 //const mirror_type_t MIRROR_TYPE_E2E = 2;
 //const pkt_type_t PKT_TYPE_NORMAL = 1;
 const pkt_type_t PKT_TYPE_MIRROR = 2;
@@ -78,40 +75,6 @@ typedef bit<8> MeterColor;
 const MeterColor MeterColor_GREEN = 8w0;
 const MeterColor MeterColor_YELLOW = 8w1;
 const MeterColor MeterColor_RED = 8w2;
-
-
-
-
-
-/*************************************************************************
-*********************** M A C R O S  *************************************
-*************************************************************************/
-//The following defined macros come from ONOS INT implementation (int_definitions.p4)
-
-// These definitions are from:
-// https://github.com/jafingerhut/p4-guide/blob/master/v1model-special-ops/v1model-special-ops.p4
-
-// These definitions are derived from the numerical values of the enum
-// named "PktInstanceType" in the p4lang/behavioral-model source file
-// targets/simple_switch/simple_switch.h
-// https://github.com/p4lang/behavioral-model/blob/master/targets/simple_switch/simple_switch.h#L126-L134
-
-const bit<32> BMV2_V1MODEL_INSTANCE_TYPE_NORMAL        = 0;
-const bit<32> BMV2_V1MODEL_INSTANCE_TYPE_INGRESS_CLONE = 1;
-const bit<32> BMV2_V1MODEL_INSTANCE_TYPE_EGRESS_CLONE  = 2;
-const bit<32> BMV2_V1MODEL_INSTANCE_TYPE_COALESCED     = 3;
-const bit<32> BMV2_V1MODEL_INSTANCE_TYPE_RECIRC        = 4;
-const bit<32> BMV2_V1MODEL_INSTANCE_TYPE_REPLICATION   = 5;
-const bit<32> BMV2_V1MODEL_INSTANCE_TYPE_RESUBMIT      = 6;
-
-#define IS_RESUBMITTED(smeta) (smeta.instance_type == BMV2_V1MODEL_INSTANCE_TYPE_RESUBMIT)
-#define IS_RECIRCULATED(smeta) (smeta.instance_type == BMV2_V1MODEL_INSTANCE_TYPE_RECIRC)
-#define IS_I2E_CLONE(smeta) (smeta.instance_type == BMV2_V1MODEL_INSTANCE_TYPE_INGRESS_CLONE)
-#define IS_E2E_CLONE(smeta) (smeta.instance_type == BMV2_V1MODEL_INSTANCE_TYPE_EGRESS_CLONE)
-#define IS_REPLICATED(smeta) (smeta.instance_type == BMV2_V1MODEL_INSTANCE_TYPE_REPLICATION)
-
-
-
 
 
 
@@ -194,37 +157,33 @@ header intl4_shim_t {
     bit<6> udp_ip_dscp;            // depends on npt field. either original dscp, ip protocol or udp dest port
     bit<10> udp_ip;                // depends on npt field. either original dscp, ip protocol or udp dest port
 }
-const bit<16> INT_SHIM_HEADER_SIZE = 4; // 4 bytes
 
+const bit<16> INT_SHIM_HEADER_SIZE = 4;
 
-
-
-
-
-// INT header. Read INT-MD Metadata Header Format from INT V2.1 specs for detailed usage of flags.
+// INT header
 header int_header_t {
-    bit<4>  ver;                    // Version
-    bit<1>  d;                      // Discard Flag. INT Sink must Discard the packet after Extracting INT-MD metadata
-    bit<1>  e;                      // Max Hop Count exceeded Flag
-    bit<1>  m;                      // MTU exceeded Flag
-    bit<12> rsvd1;                  // Reserved bits, should be set to 0 by the INT source and ignored by other nodes.
+    bit<4>   ver;                    // Version
+    bit<1>   d;                      // Discard
+    bit<1>  e;
+    bit<1>  m;
+    bit<12>  rsvd1;
     bit<5>  hop_metadata_len;
     bit<8>  remaining_hop_cnt;
     bit<4>  instruction_mask_0003; /* split the bits for lookup */
     bit<4>  instruction_mask_0407;
     bit<4>  instruction_mask_0811;
     bit<4>  instruction_mask_1215;
-    bit<16> domain_specific_id;     // Unique INT Domain ID
-    bit<16> ds_instruction;         // Instruction bitmap specific to the INT Domain identified by the Domain specific ID
-    bit<16> ds_flags;               // Domain specific flags
+    bit<16>  domain_specific_id;     // Unique INT Domain ID
+    bit<16>  ds_instruction;         // Instruction bitmap specific to the INT Domain identified by the Domain specific ID
+    bit<16>  ds_flags;               // Domain specific flags
 }
-const bit<16> INT_HEADER_SIZE = 12; // 12 bytes
+
+const bit<16> INT_HEADER_SIZE = 12;
+
+const bit<16> INT_TOTAL_HEADER_SIZE = INT_HEADER_SIZE + INT_SHIM_HEADER_SIZE;
 
 
-const bit<16> INT_TOTAL_HEADER_SIZE = INT_HEADER_SIZE + INT_SHIM_HEADER_SIZE; // 16 bytes
-
-
-// INT metadata value headers - different header for each value type
+// INT meta-value headers - different header for each value type
 header int_switch_id_t {
     bit<32> switch_id;
 }
@@ -263,16 +222,11 @@ header int_data_t {
     // varbit data; 
     // change this depending on the INT data embedded, 576 = 2 hops of all metadata. 128 = 2 hops of 64 bit metadata.
     // 8 --> 288 --> 576
-    //up to 5 hops of 64bytes metadata of each (maximum metadata on this implementation)
-    varbit<2560> data;
+    bit<704> data;
 }
 
 
-
-
-
-
-// Report Telemetry Headers - VERSION 2.0 OF TELEMETRY REPORT FORMAT
+// Report Telemetry Headers
 header report_group_header_t {
     bit<4>  ver;
     bit<6>  hw_id;
@@ -296,8 +250,6 @@ header report_individual_header_t {
     bit<16> domain_specific_id;
     bit<16> domain_specific_md_bits;
     bit<16> domain_specific_md_status;
-    // Truncated packet, Additional DS Extension Data and TLV fields are not considered 
-    // due to InType, ReportLength and RepType values. (Telemetry report format pp. 11-12)
 }
 const bit<8> REPORT_INDIVIDUAL_HEADER_LEN = 12;
 
@@ -321,20 +273,14 @@ header local_report_header_t {
     bit<64> ingress_global_tstamp;
 }
 
-
-
-
-
-
-
 const bit<8> LOCAL_REPORT_HEADER_LEN = 16;
 
-header mirror_h {
-    pkt_type_t  pkt_type;
-    bit<16> ingress_port_id;
-    bit<8>  queue_id;
-    bit<64> ingress_global_tstamp;
-}
+//header mirror_h {
+//    pkt_type_t  pkt_type;
+//    bit<16> ingress_port_id;
+//    bit<8>  queue_id;
+//    bit<64> ingress_global_tstamp;
+//}
 
 struct headers {
     //Controller packet-in packet-out headers
@@ -354,10 +300,9 @@ struct headers {
     udp_t                       report_udp;
 
     // INT Headers
-    int_header_t                int_header;  //int instructions header
-    intl4_shim_t                intl4_shim;  //int shim header
-
-    int_data_t                  int_data;    //from here, actual int metadata starts
+    int_header_t                int_header;
+    intl4_shim_t                intl4_shim;
+    int_data_t                  int_data;
     int_switch_id_t             int_switch_id;
     int_level1_port_ids_t       int_level1_port_ids;
     int_hop_latency_t           int_hop_latency;
@@ -367,12 +312,12 @@ struct headers {
     int_level2_port_ids_t       int_level2_port_ids;
     int_egress_port_tx_util_t   int_egress_tx_util;
 
-    // INT Report Headers
+    // // INT Report Headers
     report_group_header_t       report_group_header;
     report_individual_header_t  report_individual_header;
     local_report_header_t       local_report_header;
 
-    mirror_h                       mirror_header;
+    //mirror_h                       mirror_header;
 }
 
 struct int_metadata_t {
@@ -393,6 +338,6 @@ struct local_metadata_t {
     int_metadata_t int_meta;
     bool  mirror;
     pkt_type_t pkt_type;
-    //bit<3> ing_mir_ses;   // Ingress mirror session ID
+    //MirrorId_t ing_mir_ses;   // Ingress mirror session ID
     //MirrorId_t egr_mir_ses;   // Egress mirror session ID
 }

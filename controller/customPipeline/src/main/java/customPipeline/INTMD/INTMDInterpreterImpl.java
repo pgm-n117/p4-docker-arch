@@ -48,6 +48,8 @@ import static java.lang.String.format;
 import static org.onosproject.net.PortNumber.CONTROLLER;
 import static org.onosproject.net.pi.model.PiPacketOperationType.PACKET_OUT;
 
+
+
 public class INTMDInterpreterImpl extends AbstractHandlerBehaviour
         implements PiPipelineInterpreter{
 
@@ -208,7 +210,7 @@ public class INTMDInterpreterImpl extends AbstractHandlerBehaviour
     public InboundPacket mapInboundPacket(PiPacketOperation packetOperation, DeviceId deviceId) throws PiPipelineInterpreter.PiInterpreterException {
         // Assuming that the packet is ethernet, which is fine since basic.p4
         // can deparse only ethernet packets.
-        //log.info("MAPPING INBOUND PACKET __");
+        log.debug("MAPPING INBOUND PACKET __");
         Ethernet ethPkt;
         try {
 
