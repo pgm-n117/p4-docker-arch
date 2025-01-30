@@ -14,136 +14,206 @@
 # limitations under the License.
 #
 
-from mininet.net import Mininet
-from mininet.topo import Topo
+from mininet.net import Mininet, Containernet, Docker
+
+from mininet.node import Host, RemoteController
 from mininet.log import setLogLevel, info
 from mininet.cli import CLI
+from mininet.link import TCLink
+
 import os
 from nodes.p4_mininet import P4Switch, P4Host
 from nodes.dswitch.bmv2.BMV2_containernet import BMV2DockerSwitch
 from nodes.dswitch.stratum_bmv2.stratum_containernet import StratumBmv2DockerSwitch
+from nodes.dcontroller.DockerOnos import DockerOnos as dockerOnos
+from nodes.mecTopo import MECTopo
+from nodes.bmv2 import ONOSBmv2Switch
+import networkx as nx
 
 import argparse
 from time import sleep
 
+STRATUM=StratumBmv2DockerSwitch
+BMV2=BMV2DockerSwitch
+CONTROLLER_ADDRESS="172.17.0.2"
+
 
 #TODO: Rethink input parameters for building the topology, in order to be generic for different switches.
-parser = argparse.ArgumentParser(description='Mininet demo')
-parser.add_argument('--behavioral-exe', help='Path to behavioral executable',
-                    type=str, action="store", required=True)
+parser = argparse.ArgumentParser(description='Containernet demo')
+parser.add_argument('--switch-model', help='The switch model to use, BMV2 or STRATUM', type=str, default='STRATUM',
+                    choices=['BMV2', 'STRATUM'], required=True, action="store")
+
+parser.add_argument('--topo-file', help='Path to NetworkX topology file', type=str, action="store", required=False)
+
+#TODO: Not tested feature
 parser.add_argument('--thrift-port', help='Thrift server port for table updates',
                     type=int, action="store", default=9090)
+
+#TODO: Not tested feature
 parser.add_argument('--num-hosts', help='Number of hosts to connect to switch',
                     type=int, action="store", default=2)
+
+#TODO: Not tested feature
 parser.add_argument('--mode', choices=['l2', 'l3'], type=str, default='l3')
+
+#TODO: Not tested feature
 parser.add_argument('--json', help='Path to JSON config file',
                     type=str, action="store", required=True)
+
+#TODO: Not tested feature
 parser.add_argument('--pcap-dump', help='Dump packets on interfaces to pcap files',
                     type=str, action="store", required=False, default=False)
-parser.add_argument('--enable-debugger', help='Enable debugger (Please ensure debugger support is enabled in behavioral exe, as it is disabled by default)',
+
+#TODO: Not tested feature
+parser.add_argument('--enable-debugger', help='Enable behavioral model debugger (Please ensure debugger support is enabled in behavioral exe, as it is disabled by default)',
+                    action="store_true", required=False, default=False)
+
+parser.add_argument('--controller', help='Controller to use, only ONOS tested', type=str,
+                    choices=['onos', 'external'], required=False, action="store")
+
+parser.add_argument('--controler-debug', help='Enable debugger for controller',
                     action="store_true", required=False, default=False)
 
 args = parser.parse_args()
 
 
-class SingleSwitchTopo(Topo):
-    "Single switch connected to n (< 256) hosts."
-
-    def __init__(self, sw_path, json_path, thrift_port, pcap_dump, enable_debugger, n, **opts):
-        """Parameters
-        - sw_path: path to the behavioral executable, --behavioral-exe. Default location of binaries on the container is /usr/local/bin, where i.e. simple_switch is located.
-        - json_path: path to the JSON P4 compiled file, --json
-        - thrift_port: thrift server port for table updates, --thrift-port
-        - pcap_dump: dump packets on interfaces to pcap files, --pcap-dump
-        - enable_debugger: enable debugger, --enable-debugger
-        - n: number of hosts to connect to switch, --num-hosts
-        
-        IMPORTANT: Keep in mind that paths to executables and JSON files are relative to the container, not the host.
-        """
-
-        # Initialize topology and default options
-        Topo.__init__(self, **opts)
-
-        bmv2_opts={'sw_path': sw_path,
-                   'thrift_port': thrift_port,
-                   'pcap_dump': pcap_dump,
-                   'enable_debugger': enable_debugger}
-        
-        rootsw = self.addSwitch('s01',
-                                #opts=bmv2_opts, 
-                                json_path=json_path,
-                                #Docker parameters
-                                dcmd="/bin/bash", 
-                                volumes=[f"{os.getcwd()}:/bmv2"], 
-                                privileged=True, 
-                                cgroup_parent="docker.slice",
-                                controllerAddress = "172.17.0.2")
-        
-        #s1 = self.addSwitch('s1',
-        #                        #opts=bmv2_opts, 
-        #                        json_path=json_path,
-        #                        #Docker parameters
-        #                        dcmd="/bin/bash", 
-        #                        volumes=[f"{os.getcwd()}:/bmv2"], 
-        #                        privileged=True, 
-        #                        cgroup_parent="docker.slice")
-        
-        #s2 = self.addSwitch('s2',
-        #                #opts=bmv2_opts, 
-        #                json_path=json_path,
-        #                #Docker parameters
-        #                dcmd="/bin/bash", 
-        #                volumes=[f"{os.getcwd()}:/bmv2"], 
-        #                privileged=True, 
-        #                cgroup_parent="docker.slice")
-
-        #Add stratum_containernet switch
-        #switch = self.addSwitch('s1',
-        #                        dcmd="/bin/bash", 
-        #                        volumes=[f"{os.getcwd()}:/bmv2"], 
-        #                        privileged=True, 
-        #                        cgroup_parent="docker.slice",
-        #                        json=json_path)
 
 
-        for h in range(n):
-            host = self.addHost('h%d' % (h + 1),
-                                ip = "10.0.%d.10/24" % h,
-                                mac = '00:04:00:00:00:%02x' %h)
+
+
+
+
+
+
+
+
+def getFileTopology(File):
+    """
+    Reads a file containing the topology and extracts the data.
+
+    TODO: Right now it is a file with lists containing nodes, switches and links.
+    It may be better to use a JSON file format to add specific parameters to each node,
+        such as IP, MAC, etc.
+    """
+    hosts = []
+    leaf_switches = []
+    spine_switches = []
+    leaf_links = []
+    spine_links = []
+
+    # Open and read the file
+    with open(File, 'r') as file:
+        for line in file:
+            # Remove whitespace and newline characters
+            line = line.strip()
+
+            # Skip comments and empty lines
+            if line.startswith('#') or not line:
+                continue
             
-            switch = self.addSwitch('s%d' % (h + 1),
-                                #opts=bmv2_opts, 
-                                json_path=json_path,
-                                #Docker parameters
-                                dcmd="/bin/bash", 
-                                volumes=[f"{os.getcwd()}:/bmv2"], 
-                                privileged=True, 
-                                cgroup_parent="docker.slice",
-                                controllerAddress = "172.17.0.2")
+            # Extract data based on the prefix
+            if line.startswith('H='):
+                hosts = eval(line[2:])
+            elif line.startswith('LS='):
+                leaf_switches = eval(line[3:])
+            elif line.startswith('SS='):
+                spine_switches = eval(line[3:])
+            elif line.startswith('LL='):
+                leaf_links = eval(line[3:])
+            elif line.startswith('SL='):
+                spine_links = eval(line[3:])
+            elif line.startswith('C'):
+                containers = eval(line[2:])
+                #break
+
+    # Print the extracted data
+    print("Hosts:", hosts)
+    print("Containers:", containers)
+    print("Leaf Switches:", leaf_switches)
+    print("Spine Switches:", spine_switches)
+    print("Leaf Links:", leaf_links)
+    print("Spine Links:", spine_links)
+
+    return {'hosts': hosts, 'containers': containers, 'leaf_switches': leaf_switches, 'spine_switches': spine_switches, 'leaf_links': leaf_links, 'spine_links': spine_links}
 
 
-            self.addLink(host, switch)
-            self.addLink(switch, rootsw)
 
 def main():
     num_hosts = args.num_hosts
     mode = args.mode
+    controller=args.controller
 
-    topo = SingleSwitchTopo(args.behavioral_exe,
-                            args.json,
-                            args.thrift_port,
-                            args.pcap_dump,
-                            args.enable_debugger,
-                            num_hosts)
+
+
+    if controller is not None:
+        if controller == "onos":
+            print("Controller ONOS selected")
+            launchController = dockerOnos(name="onos_controller", 
+                                  dimage="onosproject/onos:2.7.0", 
+                                  ports=[6640, 6653, 8101, 8181, 9876, 5005],
+                                  port_bindings={'6640/tcp':'6640','6653/tcp':'6653','8101/tcp':'8101','8181/tcp':'8181','9876/tcp':'9876','5005/tcp':'5005'}, 
+                                  environment={"ONOS_APPS": "org.onosproject.drivers.bmv2,org.onosproject.pipelines.basic,org.onosproject.hostprovider,\
+                                               org.onosproject.lldpprovider,org.onosproject.linkdiscovery,org.onosproject.proxyarp,\
+                                               org.onosproject.hostprobingprovider,org.onosproject.drivers.p4runtime,org.onosproject.drivers.stratum,\
+                                               org.onosproject.drivers,org.onosproject.gui2", 
+                                               "JAVA_DEBUG_PORT":"0.0.0.0:5005",
+                                               "debug":"true"},
+                                 
+                                  privileged=True, 
+                                  cgroup_parent="docker.slice")
+            
+            launchController.start()
+            if(launchController.isStarted(8181)):
+                pass
+            else:
+                print("Controller not started")
+                return
+                
+
+
+    topo = None
+    if args.topo_file is not None:
+        topo = MECTopo(topology=getFileTopology(args.topo_file), 
+                       controllerAddress=(CONTROLLER_ADDRESS if controller is not None else None),
+                       switch=StratumBmv2DockerSwitch,
+                       host=P4Host)
+        
+
+    #topo = SingleSwitchTopo(args.behavioral_exe,
+    #                        args.json,
+    #                        args.thrift_port,
+    #                        args.pcap_dump,
+    #                        args.enable_debugger,
+    #                        num_hosts)
+    #topo = Containernet(
+    #    host = P4Host,
+    #    switch = StratumBmv2DockerSwitch,
+    #    controller=None)
     
+    topo.addController('c0', controller=RemoteController, ip=CONTROLLER_ADDRESS, port=8181)
+    
+    try:
 
-    net = Mininet(topo = topo,
-                  host = P4Host,
-                  switch = StratumBmv2DockerSwitch,
-                  controller = None)
-    net.start()
+        topo.start()
+
+        sleep(1)
+
+        print("Ready !")
+
+        CLI( topo )
 
 
+    except Exception as e:
+        print(e)
+    finally:
+        topo.stop()
+
+
+    if controller != None and controller != "external":
+        launchController.stop()
+
+
+    '''
     sw_mac = ["00:aa:bb:00:00:%02x" % n for n in range(num_hosts)]
 
     sw_addr = ["10.0.%d.1" % n for n in range(num_hosts)]
@@ -159,15 +229,12 @@ def main():
     for n in range(num_hosts):
         h = net.get('h%d' % (n + 1))
         h.describe()
-
-    sleep(1)
-
-    print("Ready !")
-
-    CLI( net )
-    net.stop()
+    '''
 
 if __name__ == '__main__':
     setLogLevel( 'info' )
+
     main()
+
+   
 
