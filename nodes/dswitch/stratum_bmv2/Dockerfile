@@ -27,6 +27,7 @@ ENV RUNTIME_DEPS libboost-program-options1.62.0 \
                     libjudydebian1 \
                     python3 \
                     iproute2 \
+                    tcpdump \
                     curl
 
 COPY . /stratum/
