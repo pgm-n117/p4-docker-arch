@@ -13,15 +13,15 @@ public class CustomConstants {
             PiMatchFieldId.of("standard_metadata.egress_spec");
 
     public static final PiMatchFieldId HDR_ETHERNET_SRC_ADDR =
-            PiMatchFieldId.of("hdr.ethernet.src_addr");
+            PiMatchFieldId.of("hdr.ethernet.srcAddr");
     public static final PiMatchFieldId HDR_ETHERNET_DST_ADDR =
-            PiMatchFieldId.of("hdr.ethernet.dst_addr");
+            PiMatchFieldId.of("hdr.ethernet.dstAddr");
     public static final PiMatchFieldId HDR_ETHERNET_ETHER_TYPE =
-            PiMatchFieldId.of("hdr.ethernet.ether_type");
+            PiMatchFieldId.of("hdr.ethernet.etherType");
     public static final PiMatchFieldId HDR_IPV4_SRC_ADDR =
-            PiMatchFieldId.of("hdr.ipv4.src_addr");
+            PiMatchFieldId.of("hdr.ipv4.srcAddr");
     public static final PiMatchFieldId HDR_IPV4_DST_ADDR =
-            PiMatchFieldId.of("hdr.ipv4.dst_addr");
+            PiMatchFieldId.of("hdr.ipv4.dstAddr");
     public static final PiMatchFieldId HDR_IPV4_PROTOCOL =
             PiMatchFieldId.of("hdr.ipv4.protocol");
     public static final PiMatchFieldId HDR_LOCAL_METADATA_L4_SRC_PORT =

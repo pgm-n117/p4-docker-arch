@@ -1,3 +1,6 @@
+error {
+    TcpDataOffsetTooSmall
+}
 #include <core.p4>
 #include <v1model.p4>
 
@@ -54,9 +57,9 @@ const bit<32> BMV2_V1MODEL_INSTANCE_TYPE_RESUBMIT = 6;
 }
 
 header ethernet_t {
-    bit<48> dst_addr;
-    bit<48> src_addr;
-    bit<16> ether_type;
+    bit<48> dstAddr;
+    bit<48> srcAddr;
+    bit<16> etherType;
 }
 
 const bit<8> ETH_HEADER_LEN = 14;
@@ -65,41 +68,45 @@ header ipv4_t {
     bit<4>  ihl;
     bit<6>  dscp;
     bit<2>  ecn;
-    bit<16> len;
+    bit<16> totalLen;
     bit<16> identification;
     bit<3>  flags;
-    bit<13> frag_offset;
+    bit<13> fragOffset;
     bit<8>  ttl;
     bit<8>  protocol;
-    bit<16> hdr_checksum;
-    bit<32> src_addr;
-    bit<32> dst_addr;
+    bit<16> hdrChecksum;
+    bit<32> srcAddr;
+    bit<32> dstAddr;
 }
 
 const bit<8> IPV4_MIN_HEAD_LEN = 20;
 header udp_t {
-    bit<16> src_port;
-    bit<16> dst_port;
+    bit<16> srcPort;
+    bit<16> dstPort;
     bit<16> length_;
     bit<16> checksum;
 }
 
 const bit<8> UDP_HEADER_LEN = 8;
 header tcp_t {
-    bit<16> src_port;
-    bit<16> dst_port;
-    bit<32> seq_no;
-    bit<32> ack_no;
-    bit<4>  data_offset;
+    bit<16> srcPort;
+    bit<16> dstPort;
+    bit<32> seqNo;
+    bit<32> ackNo;
+    bit<4>  dataOffset;
     bit<3>  res;
     bit<3>  ecn;
     bit<6>  ctrl;
     bit<16> window;
     bit<16> checksum;
-    bit<16> urgent_ptr;
+    bit<16> urgentPtr;
 }
 
 const bit<8> TCP_HEADER_LEN = 20;
+header tcp_options_t {
+    varbit<320> options;
+}
+
 header intl4_shim_t {
     bit<4>  int_type;
     bit<2>  npt;
@@ -231,11 +238,12 @@ struct headers {
     ipv4_t                     ipv4;
     udp_t                      udp;
     tcp_t                      tcp;
+    tcp_options_t              tcp_options;
     ethernet_t                 report_ethernet;
     ipv4_t                     report_ipv4;
     udp_t                      report_udp;
-    int_header_t               int_header;
     intl4_shim_t               intl4_shim;
+    int_header_t               int_header;
     int_data_t                 int_data;
     int_switch_id_t            int_switch_id;
     int_level1_port_ids_t      int_level1_port_ids;
@@ -271,6 +279,21 @@ struct local_metadata_t {
     pkt_type_t     pkt_type;
 }
 
+parser tcp_options_parser(packet_in packet, in bit<4> tcp_hdr_data_offset, out tcp_options_t options) {
+    bit<7> tcp_hdr_bytes_left;
+    bit<32> bits_to_extract;
+    state start {
+        verify(tcp_hdr_data_offset >= 5, error.TcpDataOffsetTooSmall);
+        tcp_hdr_bytes_left = 4 * (bit<7>)(tcp_hdr_data_offset - 5);
+        bits_to_extract = (bit<32>)(tcp_hdr_bytes_left << 3);
+        transition parse_options;
+    }
+    state parse_options {
+        packet.extract(options, bits_to_extract);
+        transition accept;
+    }
+}
+
 parser MyIngressParser(packet_in packet, out headers hdr, inout local_metadata_t local_metadata, inout standard_metadata_t standard_metadata) {
     state start {
         transition select(standard_metadata.ingress_port) {
@@ -284,7 +307,7 @@ parser MyIngressParser(packet_in packet, out headers hdr, inout local_metadata_t
     }
     state parse_ethernet {
         packet.extract(hdr.ethernet);
-        transition select(hdr.ethernet.ether_type) {
+        transition select(hdr.ethernet.etherType) {
             TYPE_IPV4: parse_ipv4;
             default: accept;
         }
@@ -299,27 +322,31 @@ parser MyIngressParser(packet_in packet, out headers hdr, inout local_metadata_t
     }
     state parse_udp {
         packet.extract(hdr.udp);
-        local_metadata.l4_src_port = hdr.udp.src_port;
-        local_metadata.l4_dst_port = hdr.udp.dst_port;
+        local_metadata.l4_src_port = hdr.udp.srcPort;
+        local_metadata.l4_dst_port = hdr.udp.dstPort;
         transition select(hdr.ipv4.dscp) {
-            DSCP_INT &&& DSCP_MASK: parse_shim;
+            DSCP_INT &&& DSCP_MASK: parse_intl4_shim;
             default: accept;
         }
     }
     state parse_tcp {
         packet.extract(hdr.tcp);
-        local_metadata.l4_src_port = hdr.tcp.src_port;
-        local_metadata.l4_dst_port = hdr.tcp.dst_port;
+        local_metadata.l4_src_port = hdr.tcp.srcPort;
+        local_metadata.l4_dst_port = hdr.tcp.dstPort;
+        tcp_options_parser.apply(packet, hdr.tcp.dataOffset, hdr.tcp_options);
         transition select(hdr.ipv4.dscp) {
-            DSCP_INT &&& DSCP_MASK: parse_shim;
+            DSCP_INT &&& DSCP_MASK: parse_intl4_shim;
             default: accept;
         }
     }
-    state parse_shim {
+    state parse_intl4_shim {
         packet.extract(hdr.intl4_shim);
-        transition parse_int_hdr;
+        transition select(hdr.intl4_shim.int_type) {
+            1: parse_int_header;
+            default: accept;
+        }
     }
-    state parse_int_hdr {
+    state parse_int_header {
         packet.extract(hdr.int_header);
         transition parse_int_data;
     }
@@ -340,6 +367,7 @@ control MyEgressDeparser(packet_out packet, in headers hdr) {
         packet.emit(hdr.ipv4);
         packet.emit(hdr.udp);
         packet.emit(hdr.tcp);
+        packet.emit(hdr.tcp_options);
         packet.emit(hdr.intl4_shim);
         packet.emit(hdr.int_header);
         packet.emit(hdr.int_switch_id);
@@ -710,7 +738,7 @@ control process_int_transit(inout headers hdr, inout local_metadata_t local_meta
         tb_int_inst_0407.apply();
         hdr.int_header.remaining_hop_cnt = hdr.int_header.remaining_hop_cnt - 1;
         if (hdr.ipv4.isValid()) {
-            hdr.ipv4.len = hdr.ipv4.len + local_metadata.int_meta.new_bytes;
+            hdr.ipv4.totalLen = hdr.ipv4.totalLen + local_metadata.int_meta.new_bytes;
         }
         if (hdr.udp.isValid()) {
             hdr.udp.length_ = hdr.udp.length_ + local_metadata.int_meta.new_bytes;
@@ -722,11 +750,15 @@ control process_int_transit(inout headers hdr, inout local_metadata_t local_meta
 }
 
 control process_int_source_sink(inout headers hdr, inout local_metadata_t local_metadata, inout standard_metadata_t standard_metadata) {
+    direct_counter(CounterType.packets_and_bytes) counter_set_source;
+    direct_counter(CounterType.packets_and_bytes) counter_set_sink;
     action int_set_source() {
         local_metadata.int_meta.source = true;
+        counter_set_source.count();
     }
     action int_set_sink() {
         local_metadata.int_meta.sink = true;
+        counter_set_sink.count();
     }
     table tb_set_source {
         key = {
@@ -736,6 +768,7 @@ control process_int_source_sink(inout headers hdr, inout local_metadata_t local_
             int_set_source;
             NoAction();
         }
+        counters = counter_set_source;
         const default_action = NoAction();
         size = 511;
     }
@@ -747,6 +780,7 @@ control process_int_source_sink(inout headers hdr, inout local_metadata_t local_
             int_set_sink;
             NoAction();
         }
+        counters = counter_set_sink;
         const default_action = NoAction();
         size = 511;
     }
@@ -757,6 +791,7 @@ control process_int_source_sink(inout headers hdr, inout local_metadata_t local_
 }
 
 control process_int_source(inout headers hdr, inout local_metadata_t local_metadata, inout standard_metadata_t standard_metadata) {
+    direct_counter(CounterType.packets_and_bytes) counter_int_source;
     action int_source(bit<5> hop_metadata_len, bit<8> remaining_hop_cnt, bit<4> ins_mask0003, bit<4> ins_mask0407) {
         hdr.intl4_shim.setValid();
         hdr.intl4_shim.int_type = 1;
@@ -779,14 +814,15 @@ control process_int_source(inout headers hdr, inout local_metadata_t local_metad
         hdr.int_header.domain_specific_id = 0;
         hdr.int_header.ds_instruction = 0;
         hdr.int_header.ds_flags = 0;
-        hdr.ipv4.len = hdr.ipv4.len + INT_TOTAL_HEADER_SIZE;
+        hdr.ipv4.totalLen = hdr.ipv4.totalLen + INT_TOTAL_HEADER_SIZE;
         hdr.udp.length_ = hdr.udp.length_ + INT_TOTAL_HEADER_SIZE;
         hdr.ipv4.dscp = DSCP_INT;
+        counter_int_source.count();
     }
     table tb_int_source {
         key = {
-            hdr.ipv4.src_addr         : ternary;
-            hdr.ipv4.dst_addr         : ternary;
+            hdr.ipv4.srcAddr          : ternary;
+            hdr.ipv4.dstAddr          : ternary;
             hdr.ipv4.protocol         : ternary;
             local_metadata.l4_src_port: ternary;
             local_metadata.l4_dst_port: ternary;
@@ -795,6 +831,7 @@ control process_int_source(inout headers hdr, inout local_metadata_t local_metad
             int_source;
             NoAction;
         }
+        counters = counter_int_source;
         const default_action = NoAction();
     }
     apply {
@@ -805,7 +842,7 @@ control process_int_source(inout headers hdr, inout local_metadata_t local_metad
 control process_int_sink(inout headers hdr, inout local_metadata_t local_metadata) {
     action restore_header() {
         hdr.ipv4.dscp = hdr.intl4_shim.udp_ip_dscp;
-        hdr.ipv4.len = hdr.ipv4.len - SHIM_LEN;
+        hdr.ipv4.totalLen = hdr.ipv4.totalLen - SHIM_LEN;
         hdr.udp.length_ = hdr.udp.length_ - SHIM_LEN;
     }
     action int_sink() {
@@ -822,25 +859,25 @@ control process_int_sink(inout headers hdr, inout local_metadata_t local_metadat
 control process_int_report(inout headers hdr, inout local_metadata_t local_metadata, inout standard_metadata_t standard_metadata) {
     action do_report_encapsulation(mac_t src_mac, mac_t mon_mac, ip_address_t src_ip, ip_address_t mon_ip, l4_port_t mon_port) {
         hdr.report_ethernet.setValid();
-        hdr.report_ethernet.dst_addr = mon_mac;
-        hdr.report_ethernet.src_addr = src_mac;
-        hdr.report_ethernet.ether_type = 0x800;
+        hdr.report_ethernet.dstAddr = mon_mac;
+        hdr.report_ethernet.srcAddr = src_mac;
+        hdr.report_ethernet.etherType = 0x800;
         hdr.report_ipv4.setValid();
         hdr.report_ipv4.version = 4w4;
         hdr.report_ipv4.ihl = 4w5;
         hdr.report_ipv4.dscp = 6w0;
         hdr.report_ipv4.ecn = 2w0;
-        hdr.report_ipv4.len = (bit<16>)IPV4_MIN_HEAD_LEN + (bit<16>)UDP_HEADER_LEN + (bit<16>)REPORT_GROUP_HEADER_LEN + (bit<16>)ETH_HEADER_LEN + (bit<16>)IPV4_MIN_HEAD_LEN + (bit<16>)UDP_HEADER_LEN + INT_DATA_LEN;
+        hdr.report_ipv4.totalLen = (bit<16>)IPV4_MIN_HEAD_LEN + (bit<16>)UDP_HEADER_LEN + (bit<16>)REPORT_GROUP_HEADER_LEN + (bit<16>)ETH_HEADER_LEN + (bit<16>)IPV4_MIN_HEAD_LEN + (bit<16>)UDP_HEADER_LEN + INT_DATA_LEN;
         hdr.report_ipv4.identification = 0;
         hdr.report_ipv4.flags = 0;
-        hdr.report_ipv4.frag_offset = 0;
+        hdr.report_ipv4.fragOffset = 0;
         hdr.report_ipv4.ttl = REPORT_HDR_TTL;
         hdr.report_ipv4.protocol = IP_PROTO_UDP;
-        hdr.report_ipv4.src_addr = src_ip;
-        hdr.report_ipv4.dst_addr = mon_ip;
+        hdr.report_ipv4.srcAddr = src_ip;
+        hdr.report_ipv4.dstAddr = mon_ip;
         hdr.report_udp.setValid();
-        hdr.report_udp.src_port = 1234;
-        hdr.report_udp.dst_port = mon_port;
+        hdr.report_udp.srcPort = 1234;
+        hdr.report_udp.dstPort = mon_port;
         hdr.report_udp.length_ = (bit<16>)UDP_HEADER_LEN + (bit<16>)REPORT_GROUP_HEADER_LEN + (bit<16>)ETH_HEADER_LEN + (bit<16>)IPV4_MIN_HEAD_LEN + (bit<16>)UDP_HEADER_LEN + INT_DATA_LEN;
         hdr.report_group_header.setValid();
         hdr.report_group_header.ver = 2;
@@ -949,11 +986,11 @@ control table0_portforward_control(inout headers hdr, inout local_metadata_t loc
     table table0 {
         key = {
             standard_metadata.ingress_port: ternary;
-            hdr.ethernet.src_addr         : ternary;
-            hdr.ethernet.dst_addr         : ternary;
-            hdr.ethernet.ether_type       : ternary;
-            hdr.ipv4.src_addr             : ternary;
-            hdr.ipv4.dst_addr             : ternary;
+            hdr.ethernet.srcAddr          : ternary;
+            hdr.ethernet.dstAddr          : ternary;
+            hdr.ethernet.etherType        : ternary;
+            hdr.ipv4.srcAddr              : ternary;
+            hdr.ipv4.dstAddr              : ternary;
             hdr.ipv4.protocol             : ternary;
             local_metadata.l4_src_port    : ternary;
             local_metadata.l4_dst_port    : ternary;
@@ -979,8 +1016,8 @@ control verify_checksum_control(inout headers hdr, inout local_metadata_t local_
 
 control compute_checksum_control(inout headers hdr, inout local_metadata_t local_metadata) {
     apply {
-        update_checksum(hdr.ipv4.isValid(), { hdr.ipv4.version, hdr.ipv4.ihl, hdr.ipv4.dscp, hdr.ipv4.ecn, hdr.ipv4.len, hdr.ipv4.identification, hdr.ipv4.flags, hdr.ipv4.frag_offset, hdr.ipv4.ttl, hdr.ipv4.protocol, hdr.ipv4.src_addr, hdr.ipv4.dst_addr }, hdr.ipv4.hdr_checksum, HashAlgorithm.csum16);
-        update_checksum(hdr.report_ipv4.isValid(), { hdr.report_ipv4.version, hdr.report_ipv4.ihl, hdr.report_ipv4.dscp, hdr.report_ipv4.ecn, hdr.report_ipv4.len, hdr.report_ipv4.identification, hdr.report_ipv4.flags, hdr.report_ipv4.frag_offset, hdr.report_ipv4.ttl, hdr.report_ipv4.protocol, hdr.report_ipv4.src_addr, hdr.report_ipv4.dst_addr }, hdr.report_ipv4.hdr_checksum, HashAlgorithm.csum16);
+        update_checksum(hdr.ipv4.isValid(), { hdr.ipv4.version, hdr.ipv4.ihl, hdr.ipv4.dscp, hdr.ipv4.ecn, hdr.ipv4.totalLen, hdr.ipv4.identification, hdr.ipv4.flags, hdr.ipv4.fragOffset, hdr.ipv4.ttl, hdr.ipv4.protocol, hdr.ipv4.srcAddr, hdr.ipv4.dstAddr }, hdr.ipv4.hdrChecksum, HashAlgorithm.csum16);
+        update_checksum(hdr.report_ipv4.isValid(), { hdr.report_ipv4.version, hdr.report_ipv4.ihl, hdr.report_ipv4.dscp, hdr.report_ipv4.ecn, hdr.report_ipv4.totalLen, hdr.report_ipv4.identification, hdr.report_ipv4.flags, hdr.report_ipv4.fragOffset, hdr.report_ipv4.ttl, hdr.report_ipv4.protocol, hdr.report_ipv4.srcAddr, hdr.report_ipv4.dstAddr }, hdr.report_ipv4.hdrChecksum, HashAlgorithm.csum16);
     }
 }
 

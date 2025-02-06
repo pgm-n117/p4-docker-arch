@@ -27,6 +27,8 @@ import org.onosproject.cfg.ComponentConfigService;
 import org.onosproject.net.*;
 
 import org.onosproject.net.behaviour.inbandtelemetry.IntDeviceConfig;
+import org.onosproject.net.behaviour.inbandtelemetry.IntMetadataType;
+import org.onosproject.net.behaviour.inbandtelemetry.IntObjective;
 import org.onosproject.net.behaviour.inbandtelemetry.IntProgrammable;
 //import org.onosproject.net.behaviour.inbandtelemetry.IntReportConfig;
 import org.onosproject.net.config.NetworkConfigService;
@@ -144,8 +146,13 @@ public class P4Routing implements P4RoutingInterface{
     private Object LinksMutex = new Object();
     private ConcurrentMap<FlowId, Link> ActiveFlowrules = new ConcurrentHashMap<>(); //Active flowrules (id) and the link its using
     private Object FlowRuleMutex = new Object();
+
     //private ConcurrentSkipListSet<Device> ConfiguredNetDevices = new ConcurrentSkipListSet<>();
     private ConcurrentMap<Device, Boolean> ConfiguredEdgeNetDevices = new ConcurrentHashMap<>(); //Boolean value: True if device has been added during app init, False if device has been added by edge port event
+    private ConcurrentMap<Device, Boolean> ConfiguredSpineNetDevices = new ConcurrentHashMap<>(); //Boolean value: True if device has been added during app init, False if device has been added by edge port event
+    private ConcurrentMap<ConnectPoint, Boolean> IntSourceSinkPorts = new ConcurrentHashMap<>();
+    private ConcurrentMap<Device, Boolean> IntTransitDevices = new ConcurrentHashMap<>();
+
 
     @Activate
     protected void activate() {
@@ -179,6 +186,17 @@ public class P4Routing implements P4RoutingInterface{
             });
 
 
+
+
+            //Start every device transit table
+            deviceService.getAvailableDevices().forEach(device -> {
+                if(device.is(IntProgrammable.class)) {
+                    IntProgrammable intProgrammable = device.as(IntProgrammable.class);
+                    intProgrammable.init();
+
+                }
+            });
+
             edgePortService.getEdgePoints().forEach(connectPoint -> {
 
                 //log.info("EDGE DEVICE: " + connectPoint.deviceId().toString() + " - INT Capable?: " + deviceService.getDevice(connectPoint.deviceId()).is(IntProgrammable.class));
@@ -188,14 +206,15 @@ public class P4Routing implements P4RoutingInterface{
 
 
                 if(!ConfiguredEdgeNetDevices.containsKey(device)){
-                    InitEdgeTrafficSelector(connectPoint.deviceId());
+                    InitEdgeTrafficSelector(connectPoint.deviceId(), true);
                 }
 
-                IntNetCFGStartUp(device);
-
-                ConfiguredEdgeNetDevices.put(device, true);
-
+                if(!IntSourceSinkPorts.containsKey(device)){
+                    IntEdgeNetCFGStartUp(connectPoint, true);
+                }
             });
+
+
 
 
             log.info(APP_NAME + " Started");
@@ -219,9 +238,8 @@ public class P4Routing implements P4RoutingInterface{
 
                 StopEdgeTrafficSelector(connectPoint.deviceId());
 
-                IntNetCFGStop(deviceService.getDevice(connectPoint.deviceId()));
+                IntEdgeNetCFGStop(connectPoint);
 
-                ConfiguredEdgeNetDevices.remove(deviceService.getDevice(connectPoint.deviceId()));
             });
 
 
@@ -247,12 +265,16 @@ public class P4Routing implements P4RoutingInterface{
     }
 
 
-    private void InitEdgeTrafficSelector(DeviceId deviceId) {
+    private void InitEdgeTrafficSelector(DeviceId deviceId, boolean startup) {
         log.info("Configuring traffic selector on device: " + deviceId.toString());
         //ARP traffic selector
         packetService.requestPackets(DefaultTrafficSelector.builder().matchEthType(Ethernet.TYPE_ARP).build(), PacketPriority.REACTIVE, appId, Optional.of(deviceId));
         //IPV4 traffic selector
         packetService.requestPackets(DefaultTrafficSelector.builder().matchEthType(Ethernet.TYPE_IPV4).build(), PacketPriority.REACTIVE, appId, Optional.of(deviceId));
+
+
+        ConfiguredEdgeNetDevices.put(deviceService.getDevice(deviceId), startup);
+
     }
 
     private void StopEdgeTrafficSelector(DeviceId deviceId) {
@@ -261,39 +283,28 @@ public class P4Routing implements P4RoutingInterface{
         packetService.cancelPackets(DefaultTrafficSelector.builder().matchEthType(Ethernet.TYPE_ARP).build(), PacketPriority.REACTIVE, appId, Optional.of(deviceId));
         //IPV4
         packetService.cancelPackets(DefaultTrafficSelector.builder().matchEthType(Ethernet.TYPE_IPV4).build(), PacketPriority.REACTIVE, appId, Optional.of(deviceId));
-        //packetService.cancelPackets(DefaultTrafficSelector.builder().matchUdpDst(TpPort.tpPort(7777)).build(), PacketPriority.HIGH, appId, Optional.of(connectPoint.deviceId()));
+
+
+        ConfiguredEdgeNetDevices.remove(deviceService.getDevice(deviceId));
     }
 
 
-    private void IntNetCFGStartUp(Device device){
-        if (device.is(IntProgrammable.class)) {
-            //    IntProgrammable intdevice = deviceService.getDevice(connectPoint.deviceId()).as(IntProgrammable.class);
+    private void IntEdgeNetCFGStartUp(ConnectPoint connectPoint, boolean startup){
+        if (deviceService.getDevice(connectPoint.deviceId()).is(IntProgrammable.class)) {
+            IntProgrammable intdevice = deviceService.getDevice(connectPoint.deviceId()).as(IntProgrammable.class);
+            intdevice.setSourcePort(connectPoint.port());
+            intdevice.setSinkPort(connectPoint.port());
 
-
-            //    intdevice.setupIntConfig(intconfig);
-            //    intdevice.setSourcePort(PortNumber.portNumber(1));
-            //    intdevice.setSinkPort(PortNumber.portNumber(2));
-            //    /*TODO:  EN NODOS INTERMEDIOS Y TAMBIÉN EN LOS EXTREMOS PARA AÑADIR LAS CABECERAS.
-            //    *  EN LOS INTERMEDIOS NO DEBERÍA HACER FALTA YA QUE TIENEN UNA REGLA POR DEFECTO:
-            //    *  SI EXISTE CABECERA INT, AÑADIR DATOS SEGUN CABECERA DE INSTRUCCIONES
-            //    *  intdevice.addIntObjective();
-            //    */
+            IntSourceSinkPorts.put(connectPoint, startup);
         }
     }
 
-    private void IntNetCFGStop(Device device){
-        if (device.is(IntProgrammable.class)) {
-            //    IntProgrammable intdevice = deviceService.getDevice(connectPoint.deviceId()).as(IntProgrammable.class);
+    private void IntEdgeNetCFGStop(ConnectPoint connectPoint){
+        if (deviceService.getDevice(connectPoint.deviceId()).is(IntProgrammable.class)) {
+            IntProgrammable intdevice = deviceService.getDevice(connectPoint.deviceId()).as(IntProgrammable.class);
+            intdevice.cleanup();
 
-
-            //    intdevice.setupIntConfig(intconfig);
-            //    intdevice.setSourcePort(PortNumber.portNumber(1));
-            //    intdevice.setSinkPort(PortNumber.portNumber(2));
-            //    /*TODO:  EN NODOS INTERMEDIOS Y TAMBIÉN EN LOS EXTREMOS PARA AÑADIR LAS CABECERAS.
-            //    *  EN LOS INTERMEDIOS NO DEBERÍA HACER FALTA YA QUE TIENEN UNA REGLA POR DEFECTO:
-            //    *  SI EXISTE CABECERA INT, AÑADIR DATOS SEGUN CABECERA DE INSTRUCCIONES
-            //    *  intdevice.addIntObjective();
-            //    */
+            IntSourceSinkPorts.remove(connectPoint);
         }
     }
 
@@ -504,6 +515,39 @@ public class P4Routing implements P4RoutingInterface{
                             registerFlow(dstIp, dstIpPort, flowrule, l);
 
                         }
+
+                        //************ INT TESTING: INSTALL INT OBJECTIVES ************
+                        if(protocol != IPv4.PROTOCOL_ICMP) {
+                            TrafficSelector.Builder intSelector = DefaultTrafficSelector.builder();
+                            intSelector.matchIPSrc(srcIp.toIpPrefix())
+                                    .matchIPDst(dstIp.toIpPrefix());
+
+                            switch (protocol) {
+                                case IPv4.PROTOCOL_TCP:
+                                    intSelector.matchTcpSrc(TpPort.tpPort(srcIpPort)).
+                                            matchTcpDst(TpPort.tpPort(dstIpPort));
+                                    break;
+                                case IPv4.PROTOCOL_UDP:
+                                    intSelector.matchUdpSrc(TpPort.tpPort(srcIpPort)).
+                                            matchUdpDst(TpPort.tpPort(dstIpPort));
+                                    break;
+                                default:
+                                    break;
+                            }
+
+                            IntObjective intObjective = IntObjective.builder()
+                                    .withMetadataTypes(Set.of(IntMetadataType.EGRESS_TIMESTAMP, IntMetadataType.INGRESS_TIMESTAMP, IntMetadataType.HOP_LATENCY, IntMetadataType.SWITCH_ID))
+                                    .withSelector(intSelector.build())
+                                    .build();
+
+
+                            if (deviceService.getDevice(l.src().deviceId()).is(IntProgrammable.class)) {
+                                IntProgrammable intHop = deviceService.getDevice(l.src().deviceId()).as(IntProgrammable.class);
+                                log.info(" --- INT OBJECTIVE INSTALLED: "+intObjective.selector().toString());
+                                intHop.addIntObjective(intObjective);
+                            }
+                        }
+                        //************ INT TESTING: INSTALL INT OBJECTIVES ************
 
                         //Reverse path
                         FlowRule reverseFlowrule = installPathFlowRule(l.dst(), protocol, dstIp, dstIpPort, srcIp, srcIpPort);
@@ -844,21 +888,21 @@ public class P4Routing implements P4RoutingInterface{
                 case EDGE_PORT_ADDED:
                     if(!ConfiguredEdgeNetDevices.containsKey(deviceService.getDevice(event.subject().deviceId()))){
                         log.info("EVENT "+event.type().toString()+", Init edge device "+event.subject().deviceId());
-                        InitEdgeTrafficSelector(event.subject().deviceId());
+                        InitEdgeTrafficSelector(event.subject().deviceId(), false);
 
-                        ConfiguredEdgeNetDevices.put(deviceService.getDevice(event.subject().deviceId()), false);
                     }
                     //IntNetCFGStartUp(event.subject());
+                    if(!IntSourceSinkPorts.containsKey(event.subject())){
+                        IntEdgeNetCFGStartUp(event.subject(), false);
+                    }
+
                     break;
                 case EDGE_PORT_REMOVED:
-
 
                     log.info("EVENT "+event.type().toString()+", Init edge device "+event.subject().deviceId());
                     StopEdgeTrafficSelector(event.subject().deviceId());
 
-                    ConfiguredEdgeNetDevices.remove(deviceService.getDevice(event.subject().deviceId()));
-
-                    //IntNetCFGStop(event.subject());
+                    IntEdgeNetCFGStop(event.subject());
 
                     break;
             }

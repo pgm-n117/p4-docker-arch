@@ -1,6 +1,7 @@
 package customPipeline.INTMD;
 
 import com.google.common.collect.Sets;
+import jdk.jfr.TransitionTo;
 import org.onosproject.net.behaviour.inbandtelemetry.IntMetadataType;
 
 import customPipeline.CustomConstants;
@@ -13,13 +14,16 @@ import org.onosproject.net.PortNumber;
 import org.onosproject.net.behaviour.inbandtelemetry.IntDeviceConfig;
 import org.onosproject.net.behaviour.inbandtelemetry.IntObjective;
 import org.onosproject.net.behaviour.inbandtelemetry.IntProgrammable;
+import org.onosproject.net.device.DeviceService;
 import org.onosproject.net.driver.AbstractHandlerBehaviour;
+import org.onosproject.net.edge.EdgePortService;
 import org.onosproject.net.flow.*;
 import org.onosproject.net.flow.criteria.Criterion;
 import org.onosproject.net.flow.criteria.IPCriterion;
 import org.onosproject.net.flow.criteria.PiCriterion;
 import org.onosproject.net.flow.criteria.TcpPortCriterion;
 import org.onosproject.net.flow.criteria.UdpPortCriterion;
+import org.onosproject.net.pi.model.PiActionId;
 import org.onosproject.net.pi.model.PiTableId;
 import org.onosproject.net.pi.runtime.PiAction;
 import org.onosproject.net.pi.runtime.PiActionParam;
@@ -44,6 +48,12 @@ public class INTMDProgrammableImpl extends AbstractHandlerBehaviour implements I
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     private CoreService coreService;
+
+    @Reference(cardinality = ReferenceCardinality.MANDATORY)
+    private EdgePortService edgePortService;
+
+    @Reference(cardinality = ReferenceCardinality.MANDATORY)
+    private DeviceService deviceService;
 
 
 
@@ -92,6 +102,7 @@ public class INTMDProgrammableImpl extends AbstractHandlerBehaviour implements I
         deviceId = this.data().deviceId();
         flowRuleService = handler().get(FlowRuleService.class);
         coreService = handler().get(CoreService.class);
+        edgePortService = handler().get(EdgePortService.class);
         appId = coreService.getAppId(PIPELINE_APP_NAME);
         if (appId == null) {
             log.warn("Application ID is null. Cannot initialize behaviour.");
@@ -133,10 +144,23 @@ public class INTMDProgrammableImpl extends AbstractHandlerBehaviour implements I
                         Integer.parseInt(deviceId.toString().substring(
                                 deviceId.toString().length() - 2)))); //deletes the first two characters of the ID, which are letters.
 
-        PiAction transitAction = PiAction.builder()
-                .withId(CustomConstants.EGRESS_TRANSIT_INT_TRANSIT_INIT_META)
-                .withParameter(transitIdParam)
-                .build();
+
+
+        PiAction.Builder transitActionBuilder = PiAction.builder();
+
+        PiActionId transitActionId = CustomConstants.NO_ACTION;
+        if(!edgePortService.getEdgePoints(deviceId).iterator().hasNext()){
+            log.info("TRANSIT INIT: DEVICE "+ deviceId+" IS NOT AN EDGE DEVICE");
+            transitActionId = CustomConstants.EGRESS_TRANSIT_INT_TRANSIT_INIT_META;
+
+            transitActionBuilder.withParameter(transitIdParam)
+                         .withId(transitActionId);
+
+        }
+        transitActionBuilder.withId(transitActionId);
+
+        PiAction transitAction = transitActionBuilder.build();
+
 
         TrafficTreatment treatment = DefaultTrafficTreatment.builder()
                 .piTableAction(transitAction)
