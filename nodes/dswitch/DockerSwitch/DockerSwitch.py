@@ -271,6 +271,8 @@ class DockerSwitch(Docker, Switch):
         for intf in links:
             #bring interfaces up
             self.cmd("ip link set {} up".format(intf.name))
+            #set a higher MTU to support packet extensions with INT metadata
+            self.cmd("ip link set {} mtu 9000".format(intf.name))
 
         #Try to obtain the IP address of the eth0 interface
         self.managementAddress = self.cmd("hostname -I").rstrip()
