@@ -58,12 +58,6 @@ from ..DockerSwitch.DockerSwitch import DockerSwitch
 import urllib
 
 
-#TODO Check how the rules are configured in the switch with the runtime_cli app. L2 mode do not work with the provided stress test configuration,
-    #    #    so, check how the L2 configuration must be to provide an alternative
-    #    #TODO Check how to connect to ONOS  controller? maybe with the p4runtime or something - DONE
-
-
-
 
 DEFAULT_NODE_ID = 1
 DEFAULT_CPU_PORT = 255
@@ -290,7 +284,6 @@ class StratumBmv2DockerSwitch(DockerSwitch):
     
 
 
-#TODO: Check utility of this function on the containerized version
     def getChassisConfig(self):
         config = """description: "stratum_bmv2 {name}"
 chassis {{
@@ -383,7 +376,6 @@ nodes {{
 
                 
             
-#TODO: Check utility of this function on the containerized version
     def printLog(self):
         if os.path.isfile(self.logfile):
             print("-" * 80)
@@ -397,7 +389,6 @@ nodes {{
 
 
 
-#TODO: Check utility of this function on the containerized version
     def stop(self, deleteIntfs=True):
         """Terminate switch."""
         self.stopped = True

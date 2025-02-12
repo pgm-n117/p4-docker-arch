@@ -87,7 +87,6 @@ public final class PipeconfLoader {
             PiPipeconf pipeconf = DefaultPiPipeconf.builder()
                     .withId(INTMD_PIPECONF_ID)
                     .withPipelineModel(parseP4Info(p4InfoUrl))
-                    //TODO: CHECK THE FOLLOWING BEHAVIOURS ACCORDING TO THE P4 PROGRAMS
                     .addBehaviour(PiPipelineInterpreter.class, INTMDInterpreterImpl.class)
                     .addBehaviour(Pipeliner.class, INTMDPipelinerImpl.class)
                     .addBehaviour(PortStatisticsDiscovery.class, PortStatisticsDiscoveryImpl.class)
@@ -112,11 +111,10 @@ public final class PipeconfLoader {
         PiPipeconf pipeconf = DefaultPiPipeconf.builder()
                 .withId(INTXD_PIPECONF_ID)
                 .withPipelineModel(parseP4Info(p4InfoUrl))
-                //TODO: CHECK THE FOLLOWING BEHAVIOURS ACCORDING TO THE P4 PROGRAMS
                 .addBehaviour(PiPipelineInterpreter.class, INTXDInterpreterImpl.class)
                 .addBehaviour(Pipeliner.class, INTXDPipelinerImpl.class)
                 .addBehaviour(PortStatisticsDiscovery.class, PortStatisticsDiscoveryImpl.class)
-                //.addBehaviour(IntProgrammable.class, IntProgrammableImpl.class) TODO: DONT KNOW YET ABOUT THIS BEHAVIOUR
+                //.addBehaviour(IntProgrammable.class, IntProgrammableImpl.class) TODO: int xd implementation
                 .addExtension(P4_INFO_TEXT, p4InfoUrl)
                 .addExtension(BMV2_JSON, jsonUrl)
                 .build();
@@ -138,11 +136,10 @@ public final class PipeconfLoader {
             PiPipeconf pipeconf = DefaultPiPipeconf.builder()
                     .withId(INTMX_PIPECONF_ID)
                     .withPipelineModel(parseP4Info(p4InfoUrl))
-                    //TODO: CHECK THE FOLLOWING BEHAVIOURS ACCORDING TO THE P4 PROGRAMS
                     .addBehaviour(PiPipelineInterpreter.class, INTMXInterpreterImpl.class)
                     .addBehaviour(Pipeliner.class, INTMXPipelinerImpl.class)
                     .addBehaviour(PortStatisticsDiscovery.class, PortStatisticsDiscoveryImpl.class)
-                    //.addBehaviour(IntProgrammable.class, IntProgrammableImpl.class) TODO: DONT KNOW YET ABOUT THIS BEHAVIOUR
+                    //.addBehaviour(IntProgrammable.class, IntProgrammableImpl.class) TODO: int mx implementation
                     .addExtension(P4_INFO_TEXT, p4InfoUrl)
                     .addExtension(BMV2_JSON, jsonUrl)
                     .build();

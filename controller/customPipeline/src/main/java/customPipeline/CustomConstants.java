@@ -4,7 +4,6 @@ import org.onosproject.net.pi.model.*;
 
 
 public class CustomConstants {
-    //TODO: METERS AND COUNTERS IDS AND ACTIONS FOR TABLES.
     //Header fields for match in tables
     public static final PiMatchFieldId HDR_STANDARD_METADATA_INGRESS_PORT =
             PiMatchFieldId.of("standard_metadata.ingress_port");
