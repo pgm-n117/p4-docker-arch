@@ -64,7 +64,7 @@ public class INTMDProgrammableImpl extends AbstractHandlerBehaviour implements I
     private DeviceId deviceId;
     private static final int DEFAULT_PRIORITY = 10000;
 
-    private static final int MAXHOP = 64;
+    private static final int MAXHOP = 64;  //although it is limited to the size of the int_data varbit header in the P4 file.
     private static final int PORTMASK = 0xffff;
     private static final int IDLE_TIMEOUT = 100;
 
@@ -249,6 +249,35 @@ public class INTMDProgrammableImpl extends AbstractHandlerBehaviour implements I
                 .forTable(CustomConstants.INGRESS_SOURCESINK_SET_SINK)
                 .build();
         flowRuleService.applyFlowRules(sinkFlowRule);
+
+        //set default flowrule for sink header removal actions (a default table)
+
+        TrafficSelector selector = DefaultTrafficSelector.builder()
+                .matchPi(PiCriterion.builder().matchExact(
+                                CustomConstants.HDR_INT_IS_VALID, (byte) 0x01)
+                        .build())
+                .build();
+
+        PiAction sinkAction = PiAction.builder()
+                .withId(CustomConstants.EGRESS_SINK_INT_SINK_REMOVE_META)
+                .build();
+
+        TrafficTreatment treatment = DefaultTrafficTreatment.builder()
+                .piTableAction(sinkAction)
+                .build();
+
+        FlowRule transitFlowRule = DefaultFlowRule.builder()
+                .withSelector(selector)
+                .withTreatment(treatment)
+                .fromApp(appId)
+                .withPriority(DEFAULT_PRIORITY)
+                .makePermanent()
+                .forDevice(deviceId)
+                .forTable(CustomConstants.EGRESS_PROCESS_INT_SINK)
+                .build();
+
+        flowRuleService.applyFlowRules(transitFlowRule);
+
         return true;
     }
 

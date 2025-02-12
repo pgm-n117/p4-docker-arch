@@ -58,6 +58,9 @@ public class CustomConstants {
     public static final PiTableId INGRESS_PROCESS_INT_SOURCE =
             PiTableId.of("MyIngress.process_int_source.tb_int_source");
 
+    public static final PiTableId EGRESS_PROCESS_INT_SINK =
+            PiTableId.of("MyEgress.process_int_sink.tb_int_sink");
+
     public static final PiTableId EGRESS_PROCESS_TRANSIT_INT_TB_INSERT =
             PiTableId.of("MyEgress.process_int_transit.tb_int_insert");
 
@@ -67,6 +70,8 @@ public class CustomConstants {
     //Table match fields
     public static final PiMatchFieldId HDR_INT_IS_VALID =
             PiMatchFieldId.of("int_is_valid");
+    public static final PiMatchFieldId INT_IS_SINK =
+            PiMatchFieldId.of("int_is_sink");
 
     //Action IDs
     public static final PiActionId INGRESS_SOURCESINK_INT_SET_SOURCE =
@@ -75,6 +80,8 @@ public class CustomConstants {
             PiActionId.of("MyIngress.process_int_source_sink.int_set_sink");
     public static final PiActionId INGRESS_SOURCE_INT_SOURCE_META = //EQUIVALENT TO INT_SOURCE_DSCP ACTION IN ONOS CODE
             PiActionId.of("MyIngress.process_int_source.int_source");
+    public static final PiActionId EGRESS_SINK_INT_SINK_REMOVE_META =
+            PiActionId.of("MyEgress.process_int_sink.int_sink");
     public static final PiActionId EGRESS_TRANSIT_INT_TRANSIT_INIT_META =
             PiActionId.of("MyEgress.process_int_transit.init_metadata");
     public static final PiActionId EGRESS_SINK_INT_DO_REPORT =
