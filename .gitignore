@@ -5,3 +5,7 @@
 *.class
 *.idea
 target
+controller/custominbandtelemetry/
+test*/
+*.pcap
+*.log
