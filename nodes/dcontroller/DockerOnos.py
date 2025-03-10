@@ -4,6 +4,7 @@ from time import sleep
 import urllib.error
 import urllib.request
 import urllib.response
+from mininet.node import Switch, Host, Docker
 
 
 ONOS_WEB_USER = "onos"
@@ -11,10 +12,12 @@ ONOS_WEB_PASS = "rocks"
 
 
 
-class DockerOnos():
+class DockerOnos(Docker):
     """
 
     """
+
+    
     
 
     def __init__(self, name,
