@@ -76,6 +76,12 @@
             <version>${onos.version}</version>
         </dependency>
 
+        <dependency>
+            <groupId>org.onosproject</groupId>
+            <artifactId>onos-drivers-p4runtime</artifactId>
+            <version>${onos.version}</version>
+        </dependency>
+
 
         <dependency>
             <groupId>org.onosproject</groupId>

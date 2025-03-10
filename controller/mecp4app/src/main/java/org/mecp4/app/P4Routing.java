@@ -20,18 +20,21 @@ package org.mecp4.app;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.errorprone.annotations.Immutable;
+
 import org.apache.commons.lang.exception.ExceptionUtils;
+import org.mecp4.app.IntConstants;
 import org.onlab.graph.ScalarWeight;
 import org.onlab.packet.*;
 import org.onosproject.cfg.ComponentConfigService;
 import org.onosproject.net.*;
 
-import org.onosproject.net.behaviour.inbandtelemetry.IntDeviceConfig;
-import org.onosproject.net.behaviour.inbandtelemetry.IntMetadataType;
-import org.onosproject.net.behaviour.inbandtelemetry.IntObjective;
-import org.onosproject.net.behaviour.inbandtelemetry.IntProgrammable;
+import org.onosproject.net.behaviour.inbandtelemetry.*;
 //import org.onosproject.net.behaviour.inbandtelemetry.IntReportConfig;
+import org.onosproject.net.config.ConfigFactory;
+import org.onosproject.net.config.NetworkConfigRegistry;
 import org.onosproject.net.config.NetworkConfigService;
+import org.onosproject.net.config.SubjectFactory;
+import org.onosproject.net.config.basics.SubjectFactories;
 import org.onosproject.net.device.DeviceEvent;
 import org.onosproject.net.device.DeviceListener;
 import org.onosproject.net.device.DeviceService;
@@ -73,7 +76,7 @@ import org.onosproject.net.pi.runtime.*;
 import java.util.Optional;
 
 import static java.nio.ByteBuffer.wrap;
-
+import static org.onosproject.net.config.basics.SubjectFactories.DEVICE_SUBJECT_FACTORY;
 
 
 /**
@@ -126,6 +129,10 @@ public class P4Routing implements P4RoutingInterface{
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected NetworkConfigService netcfgService;
 
+    @Reference(cardinality = ReferenceCardinality.MANDATORY)
+    protected NetworkConfigRegistry netcfgRegistry;
+
+
     //--------------------------------------------------------------------------
     //--------------------------------------------------------------------------
 
@@ -137,6 +144,9 @@ public class P4Routing implements P4RoutingInterface{
     //Packet Processor
     private PacketProcessor mecP4packetProcessor;
     private ApplicationId appId;
+
+    //INT configuration class
+    private IntConfig intConfig;
 
     private PipeconfListener pipeconfListener = new PipeconfListener();
     //private DeviceListener deviceListener = new deviceEventListener();
@@ -150,9 +160,34 @@ public class P4Routing implements P4RoutingInterface{
     //private ConcurrentSkipListSet<Device> ConfiguredNetDevices = new ConcurrentSkipListSet<>();
     private ConcurrentMap<Device, Boolean> ConfiguredEdgeNetDevices = new ConcurrentHashMap<>(); //Boolean value: True if device has been added during app init, False if device has been added by edge port event
     private ConcurrentMap<Device, Boolean> ConfiguredSpineNetDevices = new ConcurrentHashMap<>(); //Boolean value: True if device has been added during app init, False if device has been added by edge port event
-    private ConcurrentMap<ConnectPoint, Boolean> IntSourceSinkPorts = new ConcurrentHashMap<>();
     private ConcurrentMap<Device, Boolean> IntTransitDevices = new ConcurrentHashMap<>();
 
+    /*private static final SubjectFactory<DeviceId> DEVICE_INT_SUBJECT_FACTORY =
+            new SubjectFactory<DeviceId>(DeviceId.class, "devices") {
+
+                @Override
+                public DeviceId createSubject(String subjectKey) {
+                    return DeviceId.deviceId(subjectKey);
+                }
+            };
+    */
+    /*private final ConfigFactory<ApplicationId, P4Devices> intConfigFactory =
+            new ConfigFactory<>(SubjectFactories.APP_SUBJECT_FACTORY,
+                    P4Devices.class, "devices", true) {
+                @Override
+                public P4Devices createConfig() {
+                    return new P4Devices();
+                }
+            };
+    */
+    private final ConfigFactory <DeviceId, P4Config> intConfigFactory =
+        new ConfigFactory<DeviceId, P4Config>(DEVICE_SUBJECT_FACTORY, P4Config.class, "int") {
+
+            @Override
+            public P4Config createConfig() {
+                return new P4Config();
+            }
+        };
 
     @Activate
     protected void activate() {
@@ -167,26 +202,27 @@ public class P4Routing implements P4RoutingInterface{
             mecP4packetProcessor = new appPacketProcessor();
             packetService.addProcessor(mecP4packetProcessor, PacketProcessor.director(3));
 
-            //IntReportConfig reportConfig = new IntReportConfig();
-            //reportConfig.setCollectorIp(IpAddress.valueOf("172.0.0.1"));
-            //reportConfig.setCollectorPort(TpPort.tpPort(54321));
+
+            intConfig = new IntConfig(appId, log, deviceService, netcfgService, hostService, topologyService, flowRuleService);
+
+
 
             piPipeconfService.addListener(pipeconfListener);
             //deviceService.addListener(deviceListener);
             edgePortService.addListener(edgePortListener);
 
+             netcfgRegistry.registerConfigFactory(intConfigFactory);
+
 
             //Show each device netcfg
-            netcfgService.getSubjectClasses().forEach(subjectClass -> {
+            /*netcfgService.getSubjectClasses().forEach(subjectClass -> {
                 netcfgService.getSubjects(subjectClass).forEach(subject -> {
                     netcfgService.getConfigs(subject).forEach(config -> {
                         log.info("NETCFG SUBJECT CONFIG: "+config.toString());
                     });
                 });
             });
-
-
-
+            */
 
             //Start every device transit table
             deviceService.getAvailableDevices().forEach(device -> {
@@ -209,9 +245,8 @@ public class P4Routing implements P4RoutingInterface{
                     InitEdgeTrafficSelector(connectPoint.deviceId(), true);
                 }
 
-                if(!IntSourceSinkPorts.containsKey(device)){
-                    IntEdgeNetCFGStartUp(connectPoint, true);
-                }
+
+                intConfig.IntEdgeNetCFGStartUp(connectPoint, true);
             });
 
 
@@ -220,7 +255,8 @@ public class P4Routing implements P4RoutingInterface{
             log.info(APP_NAME + " Started");
 
         }catch (Exception ex) {
-            log.info("------------ERROR EN ACTIVATE------------" + ex);
+            log.info("------------ERROR EN ACTIVATE------------");
+            ex.printStackTrace();
         }
     }
 
@@ -238,17 +274,19 @@ public class P4Routing implements P4RoutingInterface{
 
                 StopEdgeTrafficSelector(connectPoint.deviceId());
 
-                IntEdgeNetCFGStop(connectPoint);
+                intConfig.IntEdgeNetCFGStop(connectPoint);
 
             });
 
+            netcfgRegistry.unregisterConfigFactory(intConfigFactory);
 
             piPipeconfService.removeListener(pipeconfListener);
             flowRuleService.removeFlowRulesById(appId);
             packetService.removeProcessor(mecP4packetProcessor);
             log.info(APP_NAME + " Stopped");
         } catch (Exception ex) {
-            log.info("------------ERROR DEACTIVATE------------" + ex);
+            log.info("------------ERROR DEACTIVATE------------");
+            ex.printStackTrace();
         }
     }
 
@@ -287,33 +325,6 @@ public class P4Routing implements P4RoutingInterface{
 
         ConfiguredEdgeNetDevices.remove(deviceService.getDevice(deviceId));
     }
-
-
-    private void IntEdgeNetCFGStartUp(ConnectPoint connectPoint, boolean startup){
-        if (deviceService.getDevice(connectPoint.deviceId()).is(IntProgrammable.class)) {
-            IntProgrammable intdevice = deviceService.getDevice(connectPoint.deviceId()).as(IntProgrammable.class);
-            intdevice.setSourcePort(connectPoint.port());
-            intdevice.setSinkPort(connectPoint.port());
-
-            IntSourceSinkPorts.put(connectPoint, startup);
-        }
-    }
-
-    private void IntEdgeNetCFGStop(ConnectPoint connectPoint){
-        if (deviceService.getDevice(connectPoint.deviceId()).is(IntProgrammable.class)) {
-            IntProgrammable intdevice = deviceService.getDevice(connectPoint.deviceId()).as(IntProgrammable.class);
-            intdevice.cleanup();
-
-            IntSourceSinkPorts.remove(connectPoint);
-        }
-    }
-
-
-
-
-
-
-
 
 
     private class appPacketProcessor implements PacketProcessor {
@@ -447,7 +458,6 @@ public class P4Routing implements P4RoutingInterface{
                     //Locate destination host and set a path:
                     for (Host host : hostService.getHostsByIp(dstIpAddress)) {
                         //if host up and found, set path flowrules on network devices
-
                         try {
                             setPath(context, host, protocol, srcIpAddress, srcIpPort,
                                     host.mac(), dstIpAddress, dstIpPort);
@@ -472,6 +482,7 @@ public class P4Routing implements P4RoutingInterface{
                              Ip4Address srcIp, int srcIpPort, MacAddress dstMac, Ip4Address dstIp, int dstIpPort) throws Exception {
 
             try {
+                log.info("      PATH REQUESTED AT DEVICE "+context.inPacket().receivedFrom().deviceId());
                 //Source and destination devices and ports
                 DeviceId InputDeviceId = context.inPacket().receivedFrom().deviceId();
                 PortNumber InputDevicePort = context.inPacket().receivedFrom().port();
@@ -506,7 +517,7 @@ public class P4Routing implements P4RoutingInterface{
 
 
                 if (path != null) {
-                    log.info("FOUND PATHS FOR HOSTS: "+srcIp.toString()+" - "+dstIp.toString() + " PATH: "+path.links().toString());
+                    log.info("FOUND PATHS FOR HOSTS: "+srcIp.toString()+":"+srcIpPort+"/"+protocol +" - "+dstIp.toString()+":"+dstIpPort+"/"+protocol+" PATH: "+path.links().toString());
                     //Install flowrules on each network device involved on the path. Installing for both initial and reverse paths.
 
                     path.links().forEach(l -> {
@@ -541,7 +552,7 @@ public class P4Routing implements P4RoutingInterface{
                                     .build();
 
 
-                            if (deviceService.getDevice(l.src().deviceId()).is(IntProgrammable.class)) {
+                            if (deviceService.getDevice(l.src().deviceId()).is(IntProgrammable.class) && protocol == IPv4.PROTOCOL_TCP) {
                                 IntProgrammable intHop = deviceService.getDevice(l.src().deviceId()).as(IntProgrammable.class);
                                 log.info(" --- INT OBJECTIVE INSTALLED: "+intObjective.selector().toString());
                                 intHop.addIntObjective(intObjective);
@@ -892,9 +903,8 @@ public class P4Routing implements P4RoutingInterface{
 
                     }
                     //IntNetCFGStartUp(event.subject());
-                    if(!IntSourceSinkPorts.containsKey(event.subject())){
-                        IntEdgeNetCFGStartUp(event.subject(), false);
-                    }
+                    intConfig.IntEdgeNetCFGStartUp(event.subject(), false);
+
 
                     break;
                 case EDGE_PORT_REMOVED:
@@ -902,7 +912,7 @@ public class P4Routing implements P4RoutingInterface{
                     log.info("EVENT "+event.type().toString()+", Init edge device "+event.subject().deviceId());
                     StopEdgeTrafficSelector(event.subject().deviceId());
 
-                    IntEdgeNetCFGStop(event.subject());
+                    intConfig.IntEdgeNetCFGStop(event.subject());
 
                     break;
             }
@@ -922,7 +932,7 @@ public class P4Routing implements P4RoutingInterface{
         public void event(DeviceEvent event) {
             switch (event.type()){
                 case DEVICE_ADDED: //new devices added
-                    //Configure traffic selector
+                    log.info("*** EVENT "+event.type().toString()+", Device added");
                     break;
                 case DEVICE_REMOVED: //completely removed devices from the control plane
                     break;
@@ -931,14 +941,17 @@ public class P4Routing implements P4RoutingInterface{
                 case DEVICE_SUSPENDED:
                     break;
                 case DEVICE_UPDATED:
+                    log.info("*** EVENT "+event.type().toString()+", Device updated");
                     break;
                 case PORT_ADDED:
+                    log.info("*** EVENT "+event.type().toString()+", Port added");
                     break;
                 case PORT_REMOVED:
                     break;
                 //case PORT_STATS_UPDATED: do not treat this case
                 //    break;
                 case PORT_UPDATED: //usually triggered when the port of a net device is being affected by a neighbour, i.e disconnected host or net device
+                    log.info("*** EVENT "+event.type().toString()+", Port updated");
                     break;
             }
         }

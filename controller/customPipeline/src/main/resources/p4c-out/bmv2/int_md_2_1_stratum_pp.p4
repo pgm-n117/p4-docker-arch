@@ -1,6 +1,3 @@
-error {
-    TcpDataOffsetTooSmall
-}
 #include <core.p4>
 #include <v1model.p4>
 
@@ -30,7 +27,7 @@ const bit<3> NPROTO_TELEMETRY_SWITCH_LOCAL_HEADER = 2;
 const bit<5> IPV4_OPTION_INT = 31;
 typedef bit<3> mirror_type_t;
 typedef bit<8> pkt_type_t;
-const bit<32> REPORT_MIRROR_SESSION_ID = 500;
+const bit<32> REPORT_MIRROR_SESSION_ID = 10;
 const pkt_type_t PKT_TYPE_MIRROR = 2;
 typedef bit<32> switch_id_t;
 typedef bit<48> timestamp_t;
@@ -39,6 +36,7 @@ typedef bit<8> MeterColor;
 const MeterColor MeterColor_GREEN = 8w0;
 const MeterColor MeterColor_YELLOW = 8w1;
 const MeterColor MeterColor_RED = 8w2;
+const bit<8> CLONE_FL = 1;
 const bit<32> BMV2_V1MODEL_INSTANCE_TYPE_NORMAL = 0;
 const bit<32> BMV2_V1MODEL_INSTANCE_TYPE_INGRESS_CLONE = 1;
 const bit<32> BMV2_V1MODEL_INSTANCE_TYPE_EGRESS_CLONE = 2;
@@ -155,11 +153,11 @@ header int_q_occupancy_t {
 }
 
 header int_ingress_tstamp_t {
-    bit<64> ingress_tstamp;
+    bit<32> ingress_tstamp;
 }
 
 header int_egress_tstamp_t {
-    bit<64> egress_tstamp;
+    bit<32> egress_tstamp;
 }
 
 header int_level2_port_ids_t {
@@ -177,7 +175,7 @@ header int_buffer_t {
 }
 
 header int_data_t {
-    varbit<2560> data;
+    varbit<2920> data;
 }
 
 header report_group_header_t {
@@ -280,16 +278,59 @@ struct local_metadata_t {
 }
 
 parser tcp_options_parser(packet_in packet, in bit<4> tcp_hdr_data_offset, out tcp_options_t options) {
-    bit<7> tcp_hdr_bytes_left;
-    bit<32> bits_to_extract;
     state start {
-        verify(tcp_hdr_data_offset >= 5, error.TcpDataOffsetTooSmall);
-        tcp_hdr_bytes_left = 4 * (bit<7>)(tcp_hdr_data_offset - 5);
-        bits_to_extract = (bit<32>)(tcp_hdr_bytes_left << 3);
-        transition parse_options;
+        transition select(tcp_hdr_data_offset) {
+            5: accept;
+            6: parse_options_1;
+            7: parse_options_2;
+            8: parse_options_3;
+            9: parse_options_4;
+            10: parse_options_5;
+            11: parse_options_6;
+            12: parse_options_7;
+            13: parse_options_8;
+            14: parse_options_9;
+            15: parse_options_10;
+        }
     }
-    state parse_options {
-        packet.extract(options, bits_to_extract);
+    state parse_options_1 {
+        packet.extract(options, 32);
+        transition accept;
+    }
+    state parse_options_2 {
+        packet.extract(options, 64);
+        transition accept;
+    }
+    state parse_options_3 {
+        packet.extract(options, 96);
+        transition accept;
+    }
+    state parse_options_4 {
+        packet.extract(options, 128);
+        transition accept;
+    }
+    state parse_options_5 {
+        packet.extract(options, 160);
+        transition accept;
+    }
+    state parse_options_6 {
+        packet.extract(options, 192);
+        transition accept;
+    }
+    state parse_options_7 {
+        packet.extract(options, 224);
+        transition accept;
+    }
+    state parse_options_8 {
+        packet.extract(options, 256);
+        transition accept;
+    }
+    state parse_options_9 {
+        packet.extract(options, 288);
+        transition accept;
+    }
+    state parse_options_10 {
+        packet.extract(options, 320);
         transition accept;
     }
 }
@@ -351,7 +392,7 @@ parser MyIngressParser(packet_in packet, out headers hdr, inout local_metadata_t
         transition parse_int_data;
     }
     state parse_int_data {
-        packet.extract(hdr.int_data, (bit<32>)(local_metadata.int_meta.intl4_shim_len - INT_HEADER_LEN_WORD) << 5);
+        packet.extract(hdr.int_data, (bit<32>)(hdr.intl4_shim.len - INT_HEADER_LEN_WORD) << 5);
         transition accept;
     }
 }
@@ -383,9 +424,11 @@ control MyEgressDeparser(packet_out packet, in headers hdr) {
 }
 
 control process_int_transit(inout headers hdr, inout local_metadata_t local_metadata, inout standard_metadata_t standard_metadata) {
+    direct_counter(CounterType.packets_and_bytes) counter_int_transit;
     action init_metadata(switch_id_t switch_id) {
         local_metadata.int_meta.transit = true;
         local_metadata.int_meta.switch_id = switch_id;
+        counter_int_transit.count();
     }
     action int_set_header_0() {
         hdr.int_switch_id.setValid();
@@ -407,11 +450,11 @@ control process_int_transit(inout headers hdr, inout local_metadata_t local_meta
     }
     action int_set_header_4() {
         hdr.int_ingress_tstamp.setValid();
-        hdr.int_ingress_tstamp.ingress_tstamp = (bit<64>)standard_metadata.ingress_global_timestamp;
+        hdr.int_ingress_tstamp.ingress_tstamp = (bit<32>)standard_metadata.ingress_global_timestamp;
     }
     action int_set_header_5() {
         hdr.int_egress_tstamp.setValid();
-        hdr.int_egress_tstamp.egress_tstamp = (bit<64>)standard_metadata.egress_global_timestamp;
+        hdr.int_egress_tstamp.egress_tstamp = (bit<32>)standard_metadata.egress_global_timestamp;
     }
     action int_set_header_6() {
         hdr.int_level2_port_ids.setValid();
@@ -608,6 +651,7 @@ control process_int_transit(inout headers hdr, inout local_metadata_t local_meta
             init_metadata;
             NoAction;
         }
+        counters = counter_int_transit;
         default_action = NoAction();
         size = 1;
     }
@@ -840,23 +884,121 @@ control process_int_source(inout headers hdr, inout local_metadata_t local_metad
 }
 
 control process_int_sink(inout headers hdr, inout local_metadata_t local_metadata) {
+    direct_counter(CounterType.packets_and_bytes) counter_int_sink;
     action restore_header() {
         hdr.ipv4.dscp = hdr.intl4_shim.udp_ip_dscp;
-        hdr.ipv4.totalLen = hdr.ipv4.totalLen - SHIM_LEN;
-        hdr.udp.length_ = hdr.udp.length_ - SHIM_LEN;
+        bit<16> len_bytes = (bit<16>)hdr.intl4_shim.len << 2;
+        bit<16> int_len = len_bytes + (bit<16>)INT_SHIM_HEADER_SIZE;
+        hdr.ipv4.totalLen = hdr.ipv4.totalLen - int_len;
+        hdr.udp.length_ = hdr.udp.length_ - int_len;
     }
-    action int_sink() {
+    action remove_headers() {
+        hdr.intl4_shim.setInvalid();
         hdr.int_header.setInvalid();
         hdr.int_data.setInvalid();
-        hdr.intl4_shim.setInvalid();
+        hdr.int_switch_id.setInvalid();
+        hdr.int_level1_port_ids.setInvalid();
+        hdr.int_hop_latency.setInvalid();
+        hdr.int_q_occupancy.setInvalid();
+        hdr.int_ingress_tstamp.setInvalid();
+        hdr.int_egress_tstamp.setInvalid();
+        hdr.int_level2_port_ids.setInvalid();
+        hdr.int_egress_tx_util.setInvalid();
+    }
+    action int_sink() {
+        restore_header();
+        remove_headers();
+        counter_int_sink.count();
+    }
+    table tb_int_sink {
+        key = {
+            hdr.int_header.isValid(): exact @name("int_is_valid") ;
+        }
+        actions = {
+            int_sink;
+            NoAction();
+        }
+        default_action = NoAction();
+        counters = counter_int_sink;
     }
     apply {
-        restore_header();
-        int_sink();
+        tb_int_sink.apply();
+    }
+}
+
+control DebugStdMeta(in standard_metadata_t standard_metadata) {
+    table dbg_table {
+        key = {
+            standard_metadata.ingress_port            : exact;
+            standard_metadata.egress_spec             : exact;
+            standard_metadata.egress_port             : exact;
+            standard_metadata.instance_type           : exact;
+            standard_metadata.packet_length           : exact;
+            standard_metadata.enq_timestamp           : exact;
+            standard_metadata.enq_qdepth              : exact;
+            standard_metadata.deq_timedelta           : exact;
+            standard_metadata.deq_qdepth              : exact;
+            standard_metadata.ingress_global_timestamp: exact;
+            standard_metadata.egress_global_timestamp : exact;
+            standard_metadata.mcast_grp               : exact;
+            standard_metadata.egress_rid              : exact;
+            standard_metadata.checksum_error          : exact;
+        }
+        actions = {
+            NoAction;
+        }
+        const default_action = NoAction();
+    }
+    apply {
+        dbg_table.apply();
+    }
+}
+
+control clone_counter(inout headers hdr, inout local_metadata_t local_metadata, inout standard_metadata_t standard_metadata) {
+    direct_counter(CounterType.packets_and_bytes) cloned_packets_counter;
+    action count() {
+        cloned_packets_counter.count();
+    }
+    table tb_clone_counter {
+        key = {
+            standard_metadata.instance_type: exact @name("is_cloned_packet") ;
+        }
+        actions = {
+            count;
+            NoAction();
+        }
+        default_action = NoAction();
+        counters = cloned_packets_counter;
+    }
+    apply {
+        tb_clone_counter.apply();
+    }
+}
+
+control packet_counter(inout headers hdr, inout local_metadata_t local_metadata, inout standard_metadata_t standard_metadata) {
+    direct_counter(CounterType.packets_and_bytes) packets_counter;
+    action count() {
+        packets_counter.count();
+    }
+    table tb_packet_counter {
+        key = {
+            local_metadata.int_meta.sink: exact @name("is_cloned_packet") ;
+        }
+        actions = {
+            count;
+            NoAction();
+        }
+        default_action = NoAction();
+        counters = packets_counter;
+    }
+    apply {
+        tb_packet_counter.apply();
     }
 }
 
 control process_int_report(inout headers hdr, inout local_metadata_t local_metadata, inout standard_metadata_t standard_metadata) {
+    direct_counter(CounterType.packets_and_bytes) counter_int_report;
+    direct_counter(CounterType.packets_and_bytes) counter_forward_report;
     action do_report_encapsulation(mac_t src_mac, mac_t mon_mac, ip_address_t src_ip, ip_address_t mon_ip, l4_port_t mon_port) {
         hdr.report_ethernet.setValid();
         hdr.report_ethernet.dstAddr = mon_mac;
@@ -867,7 +1009,7 @@ control process_int_report(inout headers hdr, inout local_metadata_t local_metad
         hdr.report_ipv4.ihl = 4w5;
         hdr.report_ipv4.dscp = 6w0;
         hdr.report_ipv4.ecn = 2w0;
-        hdr.report_ipv4.totalLen = (bit<16>)IPV4_MIN_HEAD_LEN + (bit<16>)UDP_HEADER_LEN + (bit<16>)REPORT_GROUP_HEADER_LEN + (bit<16>)ETH_HEADER_LEN + (bit<16>)IPV4_MIN_HEAD_LEN + (bit<16>)UDP_HEADER_LEN + INT_DATA_LEN;
+        hdr.report_ipv4.totalLen = (bit<16>)IPV4_MIN_HEAD_LEN + (bit<16>)UDP_HEADER_LEN + (bit<16>)REPORT_GROUP_HEADER_LEN + (bit<16>)ETH_HEADER_LEN + (bit<16>)hdr.ipv4.totalLen;
         hdr.report_ipv4.identification = 0;
         hdr.report_ipv4.flags = 0;
         hdr.report_ipv4.fragOffset = 0;
@@ -878,7 +1020,7 @@ control process_int_report(inout headers hdr, inout local_metadata_t local_metad
         hdr.report_udp.setValid();
         hdr.report_udp.srcPort = 1234;
         hdr.report_udp.dstPort = mon_port;
-        hdr.report_udp.length_ = (bit<16>)UDP_HEADER_LEN + (bit<16>)REPORT_GROUP_HEADER_LEN + (bit<16>)ETH_HEADER_LEN + (bit<16>)IPV4_MIN_HEAD_LEN + (bit<16>)UDP_HEADER_LEN + INT_DATA_LEN;
+        hdr.report_udp.length_ = (bit<16>)UDP_HEADER_LEN + (bit<16>)REPORT_GROUP_HEADER_LEN + (bit<16>)ETH_HEADER_LEN + (bit<16>)hdr.ipv4.totalLen;
         hdr.report_group_header.setValid();
         hdr.report_group_header.ver = 2;
         hdr.report_group_header.hw_id = HW_ID;
@@ -898,19 +1040,40 @@ control process_int_report(inout headers hdr, inout local_metadata_t local_metad
         hdr.report_individual_header.domain_specific_id = 0;
         hdr.report_individual_header.domain_specific_md_bits = 0;
         hdr.report_individual_header.domain_specific_md_status = 0;
+        counter_int_report.count();
     }
     table tb_generate_report {
         key = {
-            hdr.int_header.isValid(): exact @name("int_is_valid") ;
+            hdr.int_header.isValid()    : exact @name("int_is_valid") ;
+            local_metadata.int_meta.sink: exact @name("int_is_sink") ;
         }
         actions = {
             do_report_encapsulation;
             NoAction();
         }
         default_action = NoAction();
+        counters = counter_int_report;
+    }
+    action set_report_forwarding_port(port_t port) {
+        standard_metadata.egress_spec = port;
+        counter_forward_report.count();
+    }
+    table tb_report_forward {
+        key = {
+            hdr.report_ipv4.protocol: exact @name("report_ipv4_proto") ;
+            hdr.report_ipv4.dstAddr : exact @name("report_dst_ip") ;
+            hdr.report_udp.dstPort  : exact @name("report_dst_port") ;
+        }
+        actions = {
+            set_report_forwarding_port;
+            NoAction();
+        }
+        default_action = NoAction();
+        counters = counter_forward_report;
     }
     apply {
         tb_generate_report.apply();
+        tb_report_forward.apply();
     }
 }
 
@@ -1018,6 +1181,7 @@ control compute_checksum_control(inout headers hdr, inout local_metadata_t local
     apply {
         update_checksum(hdr.ipv4.isValid(), { hdr.ipv4.version, hdr.ipv4.ihl, hdr.ipv4.dscp, hdr.ipv4.ecn, hdr.ipv4.totalLen, hdr.ipv4.identification, hdr.ipv4.flags, hdr.ipv4.fragOffset, hdr.ipv4.ttl, hdr.ipv4.protocol, hdr.ipv4.srcAddr, hdr.ipv4.dstAddr }, hdr.ipv4.hdrChecksum, HashAlgorithm.csum16);
         update_checksum(hdr.report_ipv4.isValid(), { hdr.report_ipv4.version, hdr.report_ipv4.ihl, hdr.report_ipv4.dscp, hdr.report_ipv4.ecn, hdr.report_ipv4.totalLen, hdr.report_ipv4.identification, hdr.report_ipv4.flags, hdr.report_ipv4.fragOffset, hdr.report_ipv4.ttl, hdr.report_ipv4.protocol, hdr.report_ipv4.srcAddr, hdr.report_ipv4.dstAddr }, hdr.report_ipv4.hdrChecksum, HashAlgorithm.csum16);
+        update_checksum_with_payload(hdr.report_udp.isValid(), { hdr.report_ipv4.srcAddr, hdr.report_ipv4.dstAddr, 8w0, hdr.report_ipv4.protocol, hdr.report_udp.length_, hdr.report_udp.srcPort, hdr.report_udp.dstPort, hdr.report_udp.length_, 16w0, hdr.report_group_header, hdr.ethernet.srcAddr, hdr.ethernet.dstAddr, hdr.ethernet.etherType, hdr.ipv4, hdr.tcp, hdr.tcp_options, hdr.intl4_shim, hdr.int_header, hdr.int_data }, hdr.report_udp.checksum, HashAlgorithm.csum16);
     }
 }
 
@@ -1032,23 +1196,32 @@ control MyIngress(inout headers hdr, inout local_metadata_t meta, inout standard
             process_int_source.apply(hdr, meta, standard_metadata);
         }
         if (meta.int_meta.sink == true && hdr.int_header.isValid()) {
-            meta.pkt_type = PKT_TYPE_MIRROR;
-            clone3(CloneType.I2E, REPORT_MIRROR_SESSION_ID, standard_metadata);
+            clone3(CloneType.I2E, REPORT_MIRROR_SESSION_ID, { standard_metadata, meta.int_meta.sink });
+            if (standard_metadata.instance_type == BMV2_V1MODEL_INSTANCE_TYPE_INGRESS_CLONE) {
+                packet_counter.apply(hdr, meta, standard_metadata);
+            }
         }
     }
 }
 
 control MyEgress(inout headers hdr, inout local_metadata_t meta, inout standard_metadata_t standard_metadata) {
+    DebugStdMeta() egress_debug_std_meta;
     apply {
+        if (standard_metadata.instance_type == BMV2_V1MODEL_INSTANCE_TYPE_INGRESS_CLONE) {
+            clone_counter.apply(hdr, meta, standard_metadata);
+        }
         if (hdr.int_header.isValid()) {
             process_int_transit.apply(hdr, meta, standard_metadata);
             if (standard_metadata.instance_type == BMV2_V1MODEL_INSTANCE_TYPE_INGRESS_CLONE) {
                 process_int_report.apply(hdr, meta, standard_metadata);
             }
-            if (meta.int_meta.sink == true && !(standard_metadata.instance_type == BMV2_V1MODEL_INSTANCE_TYPE_INGRESS_CLONE)) {
-                process_int_sink.apply(hdr, meta);
+            else {
+                if (meta.int_meta.sink == true) {
+                    process_int_sink.apply(hdr, meta);
+                }
             }
         }
+        egress_debug_std_meta.apply(standard_metadata);
         port_counters_egress.apply(hdr, standard_metadata);
         port_meters_egress.apply(hdr, standard_metadata);
         packetio_egress.apply(hdr, standard_metadata);

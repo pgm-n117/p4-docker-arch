@@ -66,11 +66,22 @@ public class CustomConstants {
     public static final PiTableId EGRESS_PROCESS_INT_REPORT_GENERATE_REPORT =
             PiTableId.of("MyEgress.process_int_report.tb_generate_report");
 
+    public static final PiTableId EGRESS_FORWARD_INT_REPORT =
+            PiTableId.of("MyEgress.process_int_report.tb_report_forward");
+
+
+    public static final PiTableId EGRESS_CLONE_COUNTER =
+            PiTableId.of("MyEgress.clone_counter.tb_clone_counter");
+    public static final PiTableId INGRESS_PACKET_COUNTER =
+            PiTableId.of("MyIngress.packet_counter.tb_packet_counter");
+
     //Table match fields
     public static final PiMatchFieldId HDR_INT_IS_VALID =
             PiMatchFieldId.of("int_is_valid");
     public static final PiMatchFieldId INT_IS_SINK =
             PiMatchFieldId.of("int_is_sink");
+    public static final PiMatchFieldId IS_CLONED_PACKET =
+            PiMatchFieldId.of("is_cloned_packet");
 
     //Action IDs
     public static final PiActionId INGRESS_SOURCESINK_INT_SET_SOURCE =
@@ -85,7 +96,13 @@ public class CustomConstants {
             PiActionId.of("MyEgress.process_int_transit.init_metadata");
     public static final PiActionId EGRESS_SINK_INT_DO_REPORT =
             PiActionId.of("MyEgress.process_int_report.do_report_encapsulation");
+    public static final PiActionId SET_REPORT_FORWARDING_PORT =
+            PiActionId.of("MyEgress.process_int_report.set_report_forwarding_port");
 
+    public static final PiActionId EGRESS_CLONE_COUNT =
+            PiActionId.of("MyEgress.clone_counter.count");
+    public static final PiActionId INGRESS_PACKET_COUNT =
+            PiActionId.of("MyIngress.packet_counter.count");
     //Action Param IDs
     //action int_source(bit<5> hop_metadata_len, bit<8> remaining_hop_cnt, bit<4> ins_mask0003, bit<4> ins_mask0407)
     public static final PiActionParamId INS_MASK0407 =

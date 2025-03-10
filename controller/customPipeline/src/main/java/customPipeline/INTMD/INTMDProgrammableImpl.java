@@ -1,7 +1,16 @@
 package customPipeline.INTMD;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.Sets;
+import customPipeline.P4Config;
 import jdk.jfr.TransitionTo;
+import org.onlab.osgi.DefaultServiceDirectory;
+import org.onlab.packet.Ip4Address;
+import org.onlab.packet.IpAddress;
+import org.onlab.packet.IpPrefix;
+import org.onosproject.drivers.p4runtime.P4RuntimeReplicationGroupProgrammable;
+import org.onosproject.net.Host;
+import org.onosproject.net.Path;
 import org.onosproject.net.behaviour.inbandtelemetry.IntMetadataType;
 
 import customPipeline.CustomConstants;
@@ -14,6 +23,8 @@ import org.onosproject.net.PortNumber;
 import org.onosproject.net.behaviour.inbandtelemetry.IntDeviceConfig;
 import org.onosproject.net.behaviour.inbandtelemetry.IntObjective;
 import org.onosproject.net.behaviour.inbandtelemetry.IntProgrammable;
+import org.onosproject.net.config.Config;
+import org.onosproject.net.config.NetworkConfigService;
 import org.onosproject.net.device.DeviceService;
 import org.onosproject.net.driver.AbstractHandlerBehaviour;
 import org.onosproject.net.edge.EdgePortService;
@@ -23,16 +34,37 @@ import org.onosproject.net.flow.criteria.IPCriterion;
 import org.onosproject.net.flow.criteria.PiCriterion;
 import org.onosproject.net.flow.criteria.TcpPortCriterion;
 import org.onosproject.net.flow.criteria.UdpPortCriterion;
+import org.onosproject.net.host.HostService;
 import org.onosproject.net.pi.model.PiActionId;
+import org.onosproject.net.pi.model.PiPipeconf;
 import org.onosproject.net.pi.model.PiTableId;
 import org.onosproject.net.pi.runtime.PiAction;
 import org.onosproject.net.pi.runtime.PiActionParam;
+import org.onosproject.net.pi.runtime.PiCloneSessionEntry;
+import org.onosproject.net.pi.runtime.PiPreReplica;
+import org.onosproject.net.pi.service.PiPipeconfService;
+import org.onosproject.net.topology.TopologyService;
+import org.onosproject.p4runtime.api.P4RuntimeClient;
+import org.onosproject.p4runtime.api.P4RuntimeController;
+import org.onosproject.drivers.p4runtime.*;
+import org.onosproject.p4runtime.api.P4RuntimeWriteClient;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ReferenceCardinality;
+import org.osgi.service.dmt.spi.TransactionalDataSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import p4.v1.P4RuntimeGrpc;
+import p4.v1.P4RuntimeOuterClass;
+import org.onosproject.ui.JsonUtils;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URI;
+import java.net.URLDecoder;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -53,7 +85,16 @@ public class INTMDProgrammableImpl extends AbstractHandlerBehaviour implements I
     private EdgePortService edgePortService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
+    private HostService hostService;
+
+    @Reference(cardinality = ReferenceCardinality.MANDATORY)
+    private NetworkConfigService netcfgService;
+
+    @Reference(cardinality = ReferenceCardinality.MANDATORY)
     private DeviceService deviceService;
+
+    @Reference(cardinality = ReferenceCardinality.MANDATORY)
+    private TopologyService topologyService;
 
 
 
@@ -62,11 +103,18 @@ public class INTMDProgrammableImpl extends AbstractHandlerBehaviour implements I
     private static final String PIPELINE_APP_NAME =  "org.customPipeline.app";
     private ApplicationId appId;
     private DeviceId deviceId;
+    private PiPipeconfService piPipeconfService;
     private static final int DEFAULT_PRIORITY = 10000;
 
     private static final int MAXHOP = 64;  //although it is limited to the size of the int_data varbit header in the P4 file.
     private static final int PORTMASK = 0xffff;
     private static final int IDLE_TIMEOUT = 100;
+    private static final String DEVICE_ID_PARAM = "device_id=";
+    private static final int CLONE_SESSION_ID = 10;
+
+    private Long collectorPort = Long.MAX_VALUE;
+
+    private ConcurrentMap<DeviceId, Long> CloneReportReplicationPort = new ConcurrentHashMap<>();
 
 
 
@@ -103,7 +151,14 @@ public class INTMDProgrammableImpl extends AbstractHandlerBehaviour implements I
         flowRuleService = handler().get(FlowRuleService.class);
         coreService = handler().get(CoreService.class);
         edgePortService = handler().get(EdgePortService.class);
+        piPipeconfService = handler().get(PiPipeconfService.class);
+        netcfgService = handler().get(NetworkConfigService.class);
+        hostService = handler().get(HostService.class);
+        deviceService = handler().get(DeviceService.class);
+        topologyService = handler().get(TopologyService.class);
+
         appId = coreService.getAppId(PIPELINE_APP_NAME);
+
         if (appId == null) {
             log.warn("Application ID is null. Cannot initialize behaviour.");
             return false;
@@ -278,6 +333,161 @@ public class INTMDProgrammableImpl extends AbstractHandlerBehaviour implements I
 
         flowRuleService.applyFlowRules(transitFlowRule);
 
+        setSinkCloneCounter();
+        setSinkCloneSession();
+
+        return true;
+    }
+
+    private void setSinkCloneSession(){
+
+        //Get Report collector information to know the replication port
+        JsonNode node = netcfgService.getConfigs(deviceId).stream().collect(Collectors.toMap(Config<DeviceId>::key, Function.identity())).get("int").node();
+        //netcfgService.getConfigs(deviceId).stream().collect(Collectors.toMap(Config<DeviceId>::key, Function.identity())).get("int").node().object._children.get("collectorIP").toString()
+        //P4Config intConfig = netcfgService.getConfig(deviceId, P4Config.class);
+        IpAddress collectorIp = Ip4Address.valueOf(node.get("collectorIP").asText());
+        Set<Host> availableCollector = hostService.getHostsByIp(collectorIp);
+
+        if(availableCollector.isEmpty()) {
+            log.info("INT Report Collector not available");
+            log.error("❌ Failed to configure clone session {} on device {}", CLONE_SESSION_ID, deviceId);
+        }
+        else {
+            Host collectorHost = availableCollector.iterator().next();
+            Set<Path> pathsToCollector = topologyService.getPaths(topologyService.currentTopology(), deviceId, collectorHost.location().deviceId());
+
+            if (!pathsToCollector.isEmpty()) {
+                Path path = pathsToCollector.iterator().next();
+                collectorPort = path.links().get(0).src().port().toLong();
+
+                if (collectorPort == Long.MAX_VALUE) {
+                    log.error("Route to Report Collector from " + deviceId + " not available");
+                    log.error("❌ Failed to configure clone session {} on device {}", CLONE_SESSION_ID, deviceId);
+                    return;
+                }
+
+                //Clone group session information
+                P4RuntimeController controller = DefaultServiceDirectory.getService(P4RuntimeController.class);
+                P4RuntimeClient client = controller.get(deviceId);
+                if (client == null) {
+                    log.error("P4Runtime client not found for device {}", deviceId);
+                }
+                PiCloneSessionEntry cloneSessionEntry = PiCloneSessionEntry
+                        .builder()
+                        .withSessionId(CLONE_SESSION_ID)
+                        .addReplica(new PiPreReplica(PortNumber.portNumber(collectorPort), 0))
+                        .build();
+
+                //Submit clone session to device
+                PiPipeconf devicePipeconf = piPipeconfService.getPipeconf(deviceId).get();
+                P4RuntimeWriteClient.WriteRequest writeRequest = client.write(1, devicePipeconf);
+                writeRequest.insert(cloneSessionEntry);
+                CompletableFuture<P4RuntimeWriteClient.WriteResponse> writeFuture = writeRequest.submit();
+
+                //Handle the response
+                writeFuture.thenAccept(success -> {
+                    if (success.isSuccess()) {
+                        log.info("✅ Successfully configured clone session {} on device {}", CLONE_SESSION_ID, deviceId);
+                    } else {
+                        log.error("❌ Failed to configure clone session {} on device {}", CLONE_SESSION_ID, deviceId);
+                    }
+                });
+
+            }
+        }
+    }
+
+    private void removeSinkCloneSession(){
+        P4RuntimeController controller = DefaultServiceDirectory.getService(P4RuntimeController.class);
+        P4RuntimeClient client = controller.get(deviceId);
+        if (client == null) {
+            log.error("P4Runtime client not found for device {}", deviceId);
+        }
+
+        PiCloneSessionEntry cloneSessionEntry = PiCloneSessionEntry.builder()
+                .withSessionId(CLONE_SESSION_ID)
+                .addReplica(new PiPreReplica(PortNumber.portNumber(collectorPort), 0))
+                .build();
+
+        PiPipeconf devicePipeconf = piPipeconfService.getPipeconf(deviceId).get();
+
+        P4RuntimeWriteClient.WriteRequest writeRequest = client.write(1, devicePipeconf);
+
+        writeRequest.delete(cloneSessionEntry.handle(deviceId));
+
+        CompletableFuture<P4RuntimeWriteClient.WriteResponse> writeFuture = writeRequest.submit();
+
+        writeFuture.thenAccept(success -> {
+            if (success.isSuccess()) {
+                log.info("✅ Successfully removed clone session {} on device {}", CLONE_SESSION_ID, deviceId);
+            }else {
+                log.error("❌ Failed to remove clone session {} on device {}", CLONE_SESSION_ID, deviceId);
+            }
+        });
+
+    }
+
+
+    private boolean setSinkCloneCounter(){
+        //cloned packet criterion
+        PiCriterion isClonedCriterion = PiCriterion.builder()
+                .matchExact(CustomConstants.IS_CLONED_PACKET, (byte) 1)
+                .build();
+
+        TrafficSelector clonedPacketSelector = DefaultTrafficSelector.builder()
+                .matchPi(isClonedCriterion)
+                .build();
+
+        PiAction count = PiAction.builder()
+                .withId(CustomConstants.EGRESS_CLONE_COUNT)
+                .build();
+
+        TrafficTreatment treatment = DefaultTrafficTreatment.builder()
+                .piTableAction(count)
+                .build();
+
+        //packet counter criterion
+        PiCriterion isCloned2Criterion = PiCriterion.builder()
+                .matchExact(CustomConstants.IS_CLONED_PACKET, (byte) 1)
+                .build();
+
+        TrafficSelector clonedPacket2Selector = DefaultTrafficSelector.builder()
+                .matchPi(isCloned2Criterion)
+                .build();
+
+        PiAction count2 = PiAction.builder()
+                .withId(CustomConstants.INGRESS_PACKET_COUNT)
+                .build();
+
+        TrafficTreatment treatment2 = DefaultTrafficTreatment.builder()
+                .piTableAction(count2)
+                .build();
+
+
+
+        FlowRule counterFlowRule = DefaultFlowRule.builder()
+                .withSelector(clonedPacketSelector)
+                .withTreatment(treatment)
+                .fromApp(appId)
+                .withPriority(DEFAULT_PRIORITY)
+                .makePermanent()
+                .forDevice(deviceId)
+                .forTable(CustomConstants.EGRESS_CLONE_COUNTER)
+                .build();
+        flowRuleService.applyFlowRules(counterFlowRule);
+
+        FlowRule counterFlowRule2 = DefaultFlowRule.builder()
+                .withSelector(clonedPacket2Selector)
+                .withTreatment(treatment2)
+                .fromApp(appId)
+                .withPriority(DEFAULT_PRIORITY)
+                .makePermanent()
+                .forDevice(deviceId)
+                .forTable(CustomConstants.INGRESS_PACKET_COUNTER)
+                .build();
+        flowRuleService.applyFlowRules(counterFlowRule2);
+
+
         return true;
     }
 
@@ -321,11 +531,17 @@ public class INTMDProgrammableImpl extends AbstractHandlerBehaviour implements I
 
 
     private FlowRule buildReportEntry(IntDeviceConfig cfg) {
-        TrafficSelector selector = DefaultTrafficSelector.builder()
-                .matchPi(PiCriterion.builder().matchExact(
-                                CustomConstants.HDR_INT_IS_VALID, (byte) 0x01)
-                        .build())
+
+
+        PiCriterion transit_match_fields = PiCriterion.builder()
+                .matchExact(CustomConstants.HDR_INT_IS_VALID, (byte) 0x01)
+                .matchExact(CustomConstants.INT_IS_SINK, (byte) 0x01)
                 .build();
+
+        TrafficSelector selector = DefaultTrafficSelector.builder()
+        .matchPi(transit_match_fields)
+        .build();
+
         PiActionParam srcMacParam = new PiActionParam(
                 CustomConstants.SRC_MAC,
                 ImmutableByteSequence.copyFrom(cfg.sinkMac().toBytes()));
@@ -376,6 +592,8 @@ public class INTMDProgrammableImpl extends AbstractHandlerBehaviour implements I
                 .filter(f -> f.table().type() == TableId.Type.PIPELINE_INDEPENDENT)
                 .filter(f -> TABLES_TO_CLEANUP.contains((PiTableId) f.table()))
                 .forEach(flowRuleService::removeFlowRules);
+
+        removeSinkCloneSession();
     }
 
     @Override
@@ -544,7 +762,5 @@ public class INTMDProgrammableImpl extends AbstractHandlerBehaviour implements I
         }
         return instBitmap;
     }
-
-
 
 }
