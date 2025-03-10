@@ -71,17 +71,17 @@ BMV2_LOG_LINES = 5
 ONOS_WEB_USER = "onos"
 ONOS_WEB_PASS = "rocks"
 CONTROLLER_STRATUM_PORT = 50001
-INTCONFIG = {
-  "collectorIp": "172.17.0.3",
-  "collectorPort": 32766,
-  "minFlowHopLatencyChangeNs": 32,
-  "watchSubnets": [
-    "0.0.0.0/0",
-    "192.168.10.0/24",
-    "192.168.20.0/24",
-    "10.0.0.0/24"
-  ]
-}
+#INTCONFIG = {
+#  "collectorIp": "172.17.0.3",
+#  "collectorPort": 32766,
+#  "minFlowHopLatencyChangeNs": 32,
+#  "watchSubnets": [
+#    "0.0.0.0/0",
+#    "192.168.10.0/24",
+#    "192.168.20.0/24",
+#    "10.0.0.0/24"
+#  ]
+#}
 
 
 
@@ -129,7 +129,7 @@ class StratumBmv2DockerSwitch(DockerSwitch):
     #TODO Updating this value when using containers is not necessary, the port can be the same in every container
     nextGrpcPort = 50001
 
-    def __init__(self, name, json=STRATUM_INIT_PIPELINE, loglevel="warn",
+    def __init__(self, name, json=STRATUM_INIT_PIPELINE, loglevel="debug",
                  cpuport=DEFAULT_CPU_PORT, 
                  pipeconf=None,
                  intApplication=None,
@@ -140,6 +140,7 @@ class StratumBmv2DockerSwitch(DockerSwitch):
                  dcmd=None, 
                  build_params={},
                  controllerAddress=None,
+                 reportConfig=None,
                  **kwargs):
         
         #Initialize the DockerSwitch class
@@ -176,6 +177,7 @@ class StratumBmv2DockerSwitch(DockerSwitch):
         self.adminState = "ENABLED" if adminstate else "DISABLED"
         self.intApplication = intApplication
         self.controllerAddress = controllerAddress
+        self.reportConfig = reportConfig
 
         # Make a tmp directory for this switch
         self.cmd("mkdir -p %s" % self.tmpDir)
@@ -224,7 +226,7 @@ class StratumBmv2DockerSwitch(DockerSwitch):
         return cfgData
     
     
-    def doOnosNetcfg(self, controllerIP):
+    def doOnosNetcfg(self, controllerIP, reportConfig):
         """
         From ONOS BMV2 switch example. https://github.com/opennetworkinglab/onos/blob/dd5172e5a6e1ba5c7e17e2f497aa8c27a1ed33e9/tools/dev/mininet/bmv2.py
 
@@ -246,15 +248,21 @@ class StratumBmv2DockerSwitch(DockerSwitch):
             },
         }
 
-
-        #TODO: This should be done only once, not for every switch, but it is ok for now
+        
         if self.intApplication is not None:
-            print("Including INT application in the configuration")
-            cfgData["apps"] = {
-                self.intApplication: {
-                    "report": INTCONFIG
-                }
+            INTCONFIG = {
+              "sinkMAC": self.dcinfo["NetworkSettings"]["MacAddress"],
+              "collectorMAC": reportConfig["reportCollectorMAC"],
+              "minFlowHopLatencyChangeNs": 32,
+              "sinkIP": srcIP,
+              "collectorIP": reportConfig["reportCollectorIp"],
+              "collectorPort": reportConfig["reportCollectorPort"],
             }
+            
+            print("Including INT application in the configuration")
+            cfgData["devices"][self.onosDeviceId]["int"] = INTCONFIG
+                
+
 
         self.cmd("echo '"+json.dumps(cfgData, indent=4)+"' > "+self.netcfgFile)
 
@@ -348,6 +356,9 @@ nodes {{
                 '-max_num_controllers_per_node=%d' % MAX_CONTROLLERS_PER_NODE,
                 '-write_req_log_file=%s/write-reqs.txt' % self.tmpDir,
                 '-bmv2_log_level=%s' % self.loglevel,
+                #'-logtosyslog=true', 
+                #'-logtostderr=true',
+                
             ]
 
             cmd_string = " ".join(args)
@@ -366,7 +377,7 @@ nodes {{
             self.stopped = False
 
             #this is specific for ONOS controller.
-            self.doOnosNetcfg(self.controllerAddress)
+            self.doOnosNetcfg(self.controllerAddress, self.reportConfig)
 
         except Exception:
             StratumBmv2DockerSwitch.mininet_exception = 1

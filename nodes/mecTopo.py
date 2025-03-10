@@ -3,6 +3,8 @@ from mininet.node import RemoteController
 from mininet.link import TCLink, Link, Intf
 from mininet.net import Containernet, Docker
 from .p4_mininet import P4Host
+from .dhosts.dcollector.DockerReportCollector import DockerReportCollector
+
 
 import os
 
@@ -13,7 +15,7 @@ common_docker_kwargs={
 
 class MECTopo(Containernet):
     "A MEC test topology of N network nodes (docker P4 containers) and M host nodes (i.e.: P4Host nodes)"
-    def __init__(self, topology=None, controllerAddress=None, N=None, M=None, sw_path=None, json_path=None, **opts):
+    def __init__(self, topology=None, controllerAddress=None, collectorAddress=None, N=None, M=None, sw_path=None, json_path=None, **opts):
         """Parameters
         - sw_path: path to the behavioral executable, --behavioral-exe. Default location of binaries on the container is /usr/local/bin, where i.e. simple_switch is located.
         - json_path: path to the JSON P4 compiled file, --json
@@ -24,10 +26,14 @@ class MECTopo(Containernet):
 
         self.topology = topology
         self.controllerAddress = controllerAddress
+        self.collectorIP = collectorAddress.split(":")[0] if collectorAddress is not None else None
+        self.collectorPort = collectorAddress.split(":")[1] if collectorAddress is not None else None
+        self.collectorMAC = "00:00:0A:00:00:FD" #TODO: this mac address is 10.0.0.253 in hex, change later
         self.N = N
         self.M = M
         self.sw_path = sw_path
         self.json_path = json_path
+        self.collector = None
 
 
 
@@ -50,6 +56,7 @@ class MECTopo(Containernet):
             'spine_links': [spine_links]
         }
         """
+
         for index,host in enumerate(topology['hosts']):
             #same subnet
             h = self.addHost(host,
@@ -77,9 +84,12 @@ class MECTopo(Containernet):
                                     privileged=True, 
                                     cgroup_parent="docker.slice",
                                     controllerAddress=self.controllerAddress,
-                                    intApplication = "org.onosproject.inbandtelemetry", 
+                                    reportConfig={"reportCollectorIp":self.collectorIP, "reportCollectorPort":self.collectorPort, "reportCollectorMAC":self.collectorMAC}, #TODO: this mac address is 10.0.0.253 in hex, change later
+                                    intApplication = "org.mecp4.app",
+                                    #intApplication = "org.onosproject.inbandtelemetry", 
                                     **common_docker_kwargs,
-                                    pipeconf="org.onosproject.pipelines.intmd"
+                                    pipeconf="org.onosproject.pipelines.intmd",
+                                    loglevel="debug"
                                     #pipeconf="org.onosproject.pipelines.basic"
                                     )
                                     #use 2 cpus from a total of 12, and the next 2 cpus for the next switch
@@ -94,9 +104,12 @@ class MECTopo(Containernet):
                                     privileged=True, 
                                     cgroup_parent="docker.slice",
                                     controllerAddress=self.controllerAddress,
-                                    intApplication = "org.onosproject.inbandtelemetry",
+                                    reportConfig={"reportCollectorIp":self.collectorIP, "reportCollectorPort":self.collectorPort, "reportCollectorMAC":self.collectorMAC}, #TODO: this mac address is 10.0.0.253 in hex, change later
+                                    intApplication = "org.mecp4.app",
+                                    #intApplication = "org.onosproject.inbandtelemetry",
                                     **common_docker_kwargs,
-                                    pipeconf="org.onosproject.pipelines.intmd"
+                                    pipeconf="org.onosproject.pipelines.intmd",
+                                    loglevel="debug"
                                     #pipeconf="org.onosproject.pipelines.basic"
                                     )
         
@@ -105,6 +118,35 @@ class MECTopo(Containernet):
 
         for link in topology['spine_links']:
             self.addLink(link[0], link[1], cls=Link)
+
+
+        if self.collectorIP and self.collectorPort:
+
+            self.collector = self.addDocker("collector",
+                            cls=DockerReportCollector,
+                            #dcmd="python3 -m flask run --host=0.0.0.0",
+                            dcmd="/bin/bash",
+                            privileged=True, 
+                            cgroup_parent="docker.slice",
+                            dimage="flask-debian",
+                            ip=self.collectorIP+"/24",
+                            ports=[self.collectorPort+"/udp", 5000],
+                            port_bindings={self.collectorPort+"/udp":self.collectorPort+"/udp", '5005/tcp':'5000/tcp'},
+                            defaultRoute = "dev eth0",
+                            volumes=["/home/pablo/p4-docker-arch/nodes/dhosts/dcollector"+":/dcollector:rw"],
+                            reportConfig={"reportCollectorIp":self.collectorIP, "reportCollectorPort":self.collectorPort, "reportCollectorMAC":self.collectorMAC}, #TODO: this mac address is 10.0.0.253 in hex, change later            
+                            )
+            
+            #self.collector = self.addHost("collector",
+            #                ip=self.collectorIP+"/24",
+            #                mac="00:00:0A:00:00:FD", #TODO: this mac address is 10.0.0.253 in hex, change later            
+            #                cls=P4Host)
+            
+            
+            self.addLink("collector", topology['spine_switches'][2], cls=Link) #connect the collector to a spine switch (that turns the switch into a leaf switch!!)
+
+
+        
 
 
     def newStratumSwitch():
