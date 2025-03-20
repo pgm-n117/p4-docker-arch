@@ -26,6 +26,7 @@ from nodes.p4_mininet import P4Switch, P4Host
 from nodes.dswitch.bmv2.BMV2_containernet import BMV2DockerSwitch
 from nodes.dswitch.stratum_bmv2.stratum_containernet import StratumBmv2DockerSwitch
 from nodes.dcontroller.DockerOnos import DockerOnos as dockerOnos
+from nodes.dhosts.dcollector.DockerReportCollector import DockerReportCollector as dockerReportCollector
 from nodes.mecTopo import MECTopo
 from nodes.bmv2 import ONOSBmv2Switch
 import networkx as nx
@@ -36,7 +37,8 @@ from time import sleep
 STRATUM=StratumBmv2DockerSwitch
 BMV2=BMV2DockerSwitch
 CONTROLLER_ADDRESS="172.17.0.2"
-
+ONOS_DOCKER_APPS_DIRECTORY="/root/onos/apps/"
+ONOS_LOCAL_APPS_DIRECTORY=os.getcwd()+"/controller/"
 
 #TODO: Rethink input parameters for building the topology, in order to be generic for different switches.
 parser = argparse.ArgumentParser(description='Containernet demo')
@@ -73,6 +75,9 @@ parser.add_argument('--controller', help='Controller to use, only ONOS tested', 
 
 parser.add_argument('--controler-debug', help='Enable debugger for controller',
                     action="store_true", required=False, default=False)
+
+parser.add_argument('--reports', help='Report collector IP:PORT',
+                    type=str, action="store", required=False)
 
 args = parser.parse_args()
 
@@ -142,6 +147,21 @@ def main():
     num_hosts = args.num_hosts
     mode = args.mode
     controller=args.controller
+    reportCollector=args.reports
+
+
+
+    #old topology call
+    #topo = SingleSwitchTopo(args.behavioral_exe,
+    #                        args.json,
+    #                        args.thrift_port,
+    #                        args.pcap_dump,
+    #                        args.enable_debugger,
+    #                        num_hosts)
+    #topo = Containernet(
+    #    host = P4Host,
+    #    switch = StratumBmv2DockerSwitch,
+    #    controller=None)
 
 
 
@@ -155,12 +175,21 @@ def main():
                                   environment={"ONOS_APPS": "org.onosproject.drivers.bmv2,org.onosproject.pipelines.basic,org.onosproject.hostprovider,\
                                                org.onosproject.lldpprovider,org.onosproject.linkdiscovery,org.onosproject.proxyarp,\
                                                org.onosproject.hostprobingprovider,org.onosproject.drivers.p4runtime,org.onosproject.drivers.stratum,\
-                                               org.onosproject.drivers,org.onosproject.gui2", 
+                                               org.onosproject.drivers,org.onosproject.gui2,org.customPipeline.app,org.mecp4.app", 
                                                "JAVA_DEBUG_PORT":"0.0.0.0:5005",
                                                "debug":"true"},
                                  
                                   privileged=True, 
-                                  cgroup_parent="docker.slice")
+                                  cgroup_parent="docker.slice", 
+                                  volumes=[
+                                            #ONOS_LOCAL_APPS_DIRECTORY+"mecp4app"+"/target"+":"+ONOS_DOCKER_APPS_DIRECTORY+"org.mecp4.app"+":rw",
+                                            #os.getcwd()+"/controller/mecp4app/target/oar/m2/mecp4:/root/onos/apache-karaf-4.2.9/system/mecp4"+":rw",
+
+                                            ONOS_LOCAL_APPS_DIRECTORY+"customPipeline"+"/target"+":"+ONOS_DOCKER_APPS_DIRECTORY+"org.customPipeline.app"+":rw",
+                                            os.getcwd()+"/controller/customPipeline/target/oar/m2/customPipeline:/root/onos/apache-karaf-4.2.9/system/customPipeline"+":rw",
+
+                                            ONOS_LOCAL_APPS_DIRECTORY+"org.apache.karaf.features.cfg"+":/root/onos/apache-karaf-4.2.9/etc/org.apache.karaf.features.cfg:rw"
+                                        ])
             
             launchController.start()
             if(launchController.isStarted(8181)):
@@ -168,35 +197,34 @@ def main():
             else:
                 print("Controller not started")
                 return
-                
+                           
 
 
     topo = None
     if args.topo_file is not None:
         topo = MECTopo(topology=getFileTopology(args.topo_file), 
                        controllerAddress=(CONTROLLER_ADDRESS if controller is not None else None),
+                       collectorAddress=reportCollector,
                        switch=StratumBmv2DockerSwitch,
                        host=P4Host)
-        
-
-    #topo = SingleSwitchTopo(args.behavioral_exe,
-    #                        args.json,
-    #                        args.thrift_port,
-    #                        args.pcap_dump,
-    #                        args.enable_debugger,
-    #                        num_hosts)
-    #topo = Containernet(
-    #    host = P4Host,
-    #    switch = StratumBmv2DockerSwitch,
-    #    controller=None)
     
     topo.addController('c0', controller=RemoteController, ip=CONTROLLER_ADDRESS, port=8181)
     
     try:
-
         topo.start()
 
         sleep(1)
+
+        if reportCollector:
+            topo.collector.start()
+
+        for host in topo.hosts:
+            print(" " + host.name)
+            host.cmd("hostname")
+            host.cmd("arping -c 10 -A -I eth0 $(hostname -I) &") #Gratuitous ARP for host detection by network topology
+            #host.start()
+
+
 
         print("Ready !")
 

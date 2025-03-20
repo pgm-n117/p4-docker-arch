@@ -1,0 +1,12 @@
+#Hosts
+H=['h1','h2','h3', 'h4', 'h5']
+#Containers
+C=[]
+#Leaf Switches
+LS=['s1', 's2', 's3', 's4', 's5']
+#Spine Switches
+SS=['s11', 's12', 's13']
+#Leaf links
+LL=[('s1','h1'),('s2','h2'),('s3','h3'),('s4','h4'),('s5','h5')]
+#Spine links
+SL=[('s11','s12'),('s11','s13'),('s12','s13'),('s1','s11'),('s2','s11'),('s3','s12'),('s4','s12'),('s5','s13')]

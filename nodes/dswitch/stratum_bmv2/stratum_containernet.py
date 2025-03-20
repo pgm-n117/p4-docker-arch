@@ -91,7 +91,7 @@ class StratumBmv2DockerSwitch(DockerSwitch):
     Parameters to be passed to the constructor:
     - name: name for the switch
     - json: BMv2 JSON file, from P4 compiled code. Suggestion: Start with compiled main.p4 file from NGSDN-Tutorial.
-    - loglevel: log level for the switch
+    - loglevel: log level for the switch **[trace, debug, info, warn, error, log]** 
     - cpuport: CPU port for the switch. default port of stratum_bmv2 binary is 64. Default on this script is 255.
     - pipeconf: pipeconf for the switch
     - onosdevid: ONOS device ID for the switch

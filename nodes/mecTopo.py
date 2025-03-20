@@ -6,6 +6,7 @@ from .p4_mininet import P4Host
 from .dhosts.dcollector.DockerReportCollector import DockerReportCollector
 
 
+
 import os
 
 common_docker_kwargs={
@@ -35,7 +36,7 @@ class MECTopo(Containernet):
         self.json_path = json_path
         self.collector = None
 
-
+        print("WORKING DIRECTORY CWD = " + os.getcwd())
 
         if topology is not None:
             self.buildFileTopology(topology)
@@ -86,11 +87,9 @@ class MECTopo(Containernet):
                                     controllerAddress=self.controllerAddress,
                                     reportConfig={"reportCollectorIp":self.collectorIP, "reportCollectorPort":self.collectorPort, "reportCollectorMAC":self.collectorMAC}, #TODO: this mac address is 10.0.0.253 in hex, change later
                                     intApplication = "org.mecp4.app",
-                                    #intApplication = "org.onosproject.inbandtelemetry", 
                                     **common_docker_kwargs,
                                     pipeconf="org.onosproject.pipelines.intmd",
-                                    loglevel="debug"
-                                    #pipeconf="org.onosproject.pipelines.basic"
+                                    loglevel="off"
                                     )
                                     #use 2 cpus from a total of 12, and the next 2 cpus for the next switch
                                     #cpuset_cpus=str(index*2)+","+str(index*2+1))
@@ -106,11 +105,9 @@ class MECTopo(Containernet):
                                     controllerAddress=self.controllerAddress,
                                     reportConfig={"reportCollectorIp":self.collectorIP, "reportCollectorPort":self.collectorPort, "reportCollectorMAC":self.collectorMAC}, #TODO: this mac address is 10.0.0.253 in hex, change later
                                     intApplication = "org.mecp4.app",
-                                    #intApplication = "org.onosproject.inbandtelemetry",
                                     **common_docker_kwargs,
                                     pipeconf="org.onosproject.pipelines.intmd",
-                                    loglevel="debug"
-                                    #pipeconf="org.onosproject.pipelines.basic"
+                                    loglevel="off"
                                     )
         
         for link in topology['leaf_links']:
@@ -133,17 +130,19 @@ class MECTopo(Containernet):
                             ports=[self.collectorPort+"/udp", 5000],
                             port_bindings={self.collectorPort+"/udp":self.collectorPort+"/udp", '5005/tcp':'5000/tcp'},
                             defaultRoute = "dev eth0",
-                            volumes=["/home/pablo/p4-docker-arch/nodes/dhosts/dcollector"+":/dcollector:rw"],
+                            volumes=[os.getcwd()+"/nodes/dhosts/dcollector"+":/dcollector:rw"],
                             reportConfig={"reportCollectorIp":self.collectorIP, "reportCollectorPort":self.collectorPort, "reportCollectorMAC":self.collectorMAC}, #TODO: this mac address is 10.0.0.253 in hex, change later            
                             )
             
+            
+            #This is a collector deployed as a common mininet host, but the UDP server do not work propperly, so the docker version is used instead
             #self.collector = self.addHost("collector",
             #                ip=self.collectorIP+"/24",
             #                mac="00:00:0A:00:00:FD", #TODO: this mac address is 10.0.0.253 in hex, change later            
             #                cls=P4Host)
             
             
-            self.addLink("collector", topology['spine_switches'][2], cls=Link) #connect the collector to a spine switch (that turns the switch into a leaf switch!!)
+            self.addLink("collector", topology['spine_switches'][2], cls=Link) #connect the collector to a spine switch (this turns the switch into a leaf switch!!)
 
 
         
