@@ -45,7 +45,7 @@ parser = argparse.ArgumentParser(description='Containernet demo')
 parser.add_argument('--switch-model', help='The switch model to use, BMV2 or STRATUM', type=str, default='STRATUM',
                     choices=['BMV2', 'STRATUM'], required=True, action="store")
 
-parser.add_argument('--topo-file', help='Path to NetworkX topology file', type=str, action="store", required=False)
+parser.add_argument('--topo-file', help='Path to NetworkX topology file', type=str, action="store", required=True)
 
 #TODO: Not tested feature
 parser.add_argument('--thrift-port', help='Thrift server port for table updates',
@@ -105,6 +105,7 @@ def getFileTopology(File):
     spine_switches = []
     leaf_links = []
     spine_links = []
+    containers = []
 
     # Open and read the file
     with open(File, 'r') as file:
@@ -164,6 +165,19 @@ def main():
     #    controller=None)
 
 
+    topo = None
+    
+    try:
+        #Limited to 65534 hosts
+        topology_config = getFileTopology(args.topo_file)
+        if len(topology_config['hosts']) > pow(2,16)-2:
+            raise AssertionError(f"Can't launch more than {pow(2,16)-2} hosts")
+    except AssertionError as e:
+        print(e) 
+        exit(0)
+
+    
+    
 
     if controller is not None:
         if controller == "onos":
@@ -199,15 +213,12 @@ def main():
                 return
                            
 
+    topo = MECTopo(topology=topology_config, 
+                    controllerAddress=(CONTROLLER_ADDRESS if controller is not None else None),
+                    collectorAddress=reportCollector,
+                    switch=StratumBmv2DockerSwitch,
+                    HostCls=Host)
 
-    topo = None
-    if args.topo_file is not None:
-        topo = MECTopo(topology=getFileTopology(args.topo_file), 
-                       controllerAddress=(CONTROLLER_ADDRESS if controller is not None else None),
-                       collectorAddress=reportCollector,
-                       switch=StratumBmv2DockerSwitch,
-                       host=P4Host)
-    
     topo.addController('c0', controller=RemoteController, ip=CONTROLLER_ADDRESS, port=8181)
     
     try:

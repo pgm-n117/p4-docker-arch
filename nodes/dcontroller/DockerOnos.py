@@ -4,7 +4,7 @@ from time import sleep
 import urllib.error
 import urllib.request
 import urllib.response
-from mininet.node import Switch, Host, Docker
+from mininet.node import Switch, Host, Docker, RemoteController, Controller
 
 
 ONOS_WEB_USER = "onos"
@@ -12,7 +12,7 @@ ONOS_WEB_PASS = "rocks"
 
 
 
-class DockerOnos(Docker):
+class DockerOnos(Docker, Controller): #TODO hacer que herede de RemoteController e integrarlo con el flujo de trabajo de mininet/containernet
     """
 
     """

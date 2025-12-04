@@ -4,7 +4,7 @@ from mininet.link import TCLink, Link, Intf
 from mininet.net import Containernet, Docker
 from .p4_mininet import P4Host
 from .dhosts.dcollector.DockerReportCollector import DockerReportCollector
-
+import math
 
 
 import os
@@ -16,7 +16,7 @@ common_docker_kwargs={
 
 class MECTopo(Containernet):
     "A MEC test topology of N network nodes (docker P4 containers) and M host nodes (i.e.: P4Host nodes)"
-    def __init__(self, topology=None, controllerAddress=None, collectorAddress=None, N=None, M=None, sw_path=None, json_path=None, **opts):
+    def __init__(self, topology=None, controllerAddress=None, collectorAddress=None, N=None, M=None, sw_path=None, json_path=None, HostCls=None, **opts):
         """Parameters
         - sw_path: path to the behavioral executable, --behavioral-exe. Default location of binaries on the container is /usr/local/bin, where i.e. simple_switch is located.
         - json_path: path to the JSON P4 compiled file, --json
@@ -35,6 +35,7 @@ class MECTopo(Containernet):
         self.sw_path = sw_path
         self.json_path = json_path
         self.collector = None
+        self.HostCls = HostCls
 
         print("WORKING DIRECTORY CWD = " + os.getcwd())
 
@@ -57,14 +58,22 @@ class MECTopo(Containernet):
             'spine_links': [spine_links]
         }
         """
+           
 
-        for index,host in enumerate(topology['hosts']):
-            #same subnet
-            h = self.addHost(host,
-                        ip = "10.0.0.1%d/24" % index,
-                        mac = '00:04:00:00:00:%02x' %index,
-                        cls=P4Host)
-            #.setDefaultRoute("dev eth0")
+        for index, host in enumerate(topology['hosts']):
+            netmask = 32-math.ceil(math.log2(len(topology['hosts'])+2))
+            # Calculamos octetos de la IP
+            second_octet = (index+1 >> 16) & 0xFF
+            third_octet  = (index+1 >> 8) & 0xFF
+            fourth_octet = index+1 & 0xFF
+
+            h = self.addHost(
+                host,
+                ip = "10.%d.%d.%d/%d" % (second_octet, third_octet, fourth_octet, netmask),
+                mac = "00:04:00:%02x:%02x:%02x" % (second_octet, third_octet, fourth_octet),
+                cls=self.HostCls
+            )
+
             
         for index,container in enumerate(topology['containers']):
             #Add host containers
