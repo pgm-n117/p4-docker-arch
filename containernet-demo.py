@@ -26,9 +26,9 @@ from nodes.p4_mininet import P4Switch, P4Host
 from nodes.dswitch.bmv2.BMV2_containernet import BMV2DockerSwitch
 from nodes.dswitch.stratum_bmv2.stratum_containernet import StratumBmv2DockerSwitch
 from nodes.dcontroller.DockerOnos import DockerOnos as dockerOnos
-from nodes.dhosts.dcollector.DockerReportCollector import DockerReportCollector as dockerReportCollector
+#from nodes.dhosts.dcollector.DockerReportCollector import DockerReportCollector as dockerReportCollector
 from nodes.mecTopo import MECTopo
-from nodes.bmv2 import ONOSBmv2Switch
+#from nodes.bmv2 import ONOSBmv2Switch
 import networkx as nx
 
 import argparse

@@ -3,7 +3,7 @@ from mininet.node import RemoteController
 from mininet.link import TCLink, Link, Intf
 from mininet.net import Containernet, Docker
 from .p4_mininet import P4Host
-from .dhosts.dcollector.DockerReportCollector import DockerReportCollector
+#from .dhosts.dcollector.DockerReportCollector import DockerReportCollector
 import math
 
 
