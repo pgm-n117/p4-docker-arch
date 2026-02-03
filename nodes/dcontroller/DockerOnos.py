@@ -240,7 +240,7 @@ class DockerOnos(Docker, Controller): #TODO hacer que herede de RemoteController
                 try:
                     f = urllib.request.urlopen(url, data=None)
                 except urllib.error.URLError as e:
-                    print("Error connecting to controller port " + str(port) + ": " + "Status: "+ str(e.status) + " " +e.reason)
+                    print("Error connecting to controller port " + str(port) + ": " + str(e))
                 finally:
                     #print("Connection result: %s\n" % str(connectionResult))
                     if f is not None:
