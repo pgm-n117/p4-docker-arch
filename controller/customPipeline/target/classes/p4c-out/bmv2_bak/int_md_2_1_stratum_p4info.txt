@@ -1,0 +1,839 @@
+pkg_info {
+  arch: "v1model"
+}
+tables {
+  preamble {
+    id: 33564444
+    name: "MyIngress.table0_portforward_control.table0"
+    alias: "table0"
+  }
+  match_fields {
+    id: 1
+    name: "standard_metadata.ingress_port"
+    bitwidth: 9
+    match_type: TERNARY
+  }
+  match_fields {
+    id: 2
+    name: "hdr.ethernet.srcAddr"
+    bitwidth: 48
+    match_type: TERNARY
+  }
+  match_fields {
+    id: 3
+    name: "hdr.ethernet.dstAddr"
+    bitwidth: 48
+    match_type: TERNARY
+  }
+  match_fields {
+    id: 4
+    name: "hdr.ethernet.etherType"
+    bitwidth: 16
+    match_type: TERNARY
+  }
+  match_fields {
+    id: 5
+    name: "hdr.ipv4.srcAddr"
+    bitwidth: 32
+    match_type: TERNARY
+  }
+  match_fields {
+    id: 6
+    name: "hdr.ipv4.dstAddr"
+    bitwidth: 32
+    match_type: TERNARY
+  }
+  match_fields {
+    id: 7
+    name: "hdr.ipv4.protocol"
+    bitwidth: 8
+    match_type: TERNARY
+  }
+  match_fields {
+    id: 8
+    name: "local_metadata.l4_src_port"
+    bitwidth: 16
+    match_type: TERNARY
+  }
+  match_fields {
+    id: 9
+    name: "local_metadata.l4_dst_port"
+    bitwidth: 16
+    match_type: TERNARY
+  }
+  action_refs {
+    id: 16831713
+  }
+  action_refs {
+    id: 16779678
+  }
+  action_refs {
+    id: 16781077
+  }
+  action_refs {
+    id: 16793765
+  }
+  const_default_action_id: 16793765
+  direct_resource_ids: 318774144
+  size: 1024
+}
+tables {
+  preamble {
+    id: 33580202
+    name: "MyIngress.process_int_source_sink.tb_set_source"
+    alias: "tb_set_source"
+  }
+  match_fields {
+    id: 1
+    name: "standard_metadata.ingress_port"
+    bitwidth: 9
+    match_type: EXACT
+  }
+  action_refs {
+    id: 16821886
+  }
+  action_refs {
+    id: 16800567
+  }
+  const_default_action_id: 16800567
+  direct_resource_ids: 318792132
+  size: 511
+}
+tables {
+  preamble {
+    id: 33580474
+    name: "MyIngress.process_int_source_sink.tb_set_sink"
+    alias: "tb_set_sink"
+  }
+  match_fields {
+    id: 1
+    name: "standard_metadata.egress_spec"
+    bitwidth: 9
+    match_type: EXACT
+  }
+  action_refs {
+    id: 16819102
+  }
+  action_refs {
+    id: 16800567
+  }
+  const_default_action_id: 16800567
+  direct_resource_ids: 318792099
+  size: 511
+}
+tables {
+  preamble {
+    id: 33596879
+    name: "MyIngress.process_int_source.tb_int_source"
+    alias: "tb_int_source"
+  }
+  match_fields {
+    id: 1
+    name: "hdr.ipv4.srcAddr"
+    bitwidth: 32
+    match_type: TERNARY
+  }
+  match_fields {
+    id: 2
+    name: "hdr.ipv4.dstAddr"
+    bitwidth: 32
+    match_type: TERNARY
+  }
+  match_fields {
+    id: 3
+    name: "hdr.ipv4.protocol"
+    bitwidth: 8
+    match_type: TERNARY
+  }
+  match_fields {
+    id: 4
+    name: "local_metadata.l4_src_port"
+    bitwidth: 16
+    match_type: TERNARY
+  }
+  match_fields {
+    id: 5
+    name: "local_metadata.l4_dst_port"
+    bitwidth: 16
+    match_type: TERNARY
+  }
+  action_refs {
+    id: 16793391
+  }
+  action_refs {
+    id: 16800567
+  }
+  const_default_action_id: 16800567
+  direct_resource_ids: 318788515
+  size: 1024
+}
+tables {
+  preamble {
+    id: 33579095
+    name: "MyEgress.process_int_transit.tb_int_insert"
+    alias: "tb_int_insert"
+  }
+  match_fields {
+    id: 1
+    name: "int_is_valid"
+    bitwidth: 1
+    match_type: EXACT
+  }
+  action_refs {
+    id: 16789499
+  }
+  action_refs {
+    id: 16800567
+  }
+  size: 1
+}
+tables {
+  preamble {
+    id: 33597212
+    name: "MyEgress.process_int_transit.tb_int_inst_0003"
+    alias: "tb_int_inst_0003"
+  }
+  match_fields {
+    id: 1
+    name: "hdr.int_header.instruction_mask_0003"
+    bitwidth: 4
+    match_type: EXACT
+  }
+  action_refs {
+    id: 16798370
+  }
+  action_refs {
+    id: 16813326
+  }
+  action_refs {
+    id: 16806712
+  }
+  action_refs {
+    id: 16821560
+  }
+  action_refs {
+    id: 16796125
+  }
+  action_refs {
+    id: 16802887
+  }
+  action_refs {
+    id: 16834830
+  }
+  action_refs {
+    id: 16784042
+  }
+  action_refs {
+    id: 16791046
+  }
+  action_refs {
+    id: 16833415
+  }
+  action_refs {
+    id: 16832311
+  }
+  action_refs {
+    id: 16827646
+  }
+  action_refs {
+    id: 16836722
+  }
+  action_refs {
+    id: 16824663
+  }
+  action_refs {
+    id: 16834274
+  }
+  action_refs {
+    id: 16806796
+  }
+  action_refs {
+    id: 16800567
+    annotations: "@defaultonly"
+    scope: DEFAULT_ONLY
+  }
+  size: 16
+  is_const_table: true
+}
+tables {
+  preamble {
+    id: 33591543
+    name: "MyEgress.process_int_transit.tb_int_inst_0407"
+    alias: "tb_int_inst_0407"
+  }
+  match_fields {
+    id: 1
+    name: "hdr.int_header.instruction_mask_0407"
+    bitwidth: 4
+    match_type: EXACT
+  }
+  action_refs {
+    id: 16812339
+  }
+  action_refs {
+    id: 16798323
+  }
+  action_refs {
+    id: 16824054
+  }
+  action_refs {
+    id: 16815932
+  }
+  action_refs {
+    id: 16817924
+  }
+  action_refs {
+    id: 16802448
+  }
+  action_refs {
+    id: 16828013
+  }
+  action_refs {
+    id: 16786926
+  }
+  action_refs {
+    id: 16788886
+  }
+  action_refs {
+    id: 16839014
+  }
+  action_refs {
+    id: 16793713
+  }
+  action_refs {
+    id: 16792839
+  }
+  action_refs {
+    id: 16790541
+  }
+  action_refs {
+    id: 16814224
+  }
+  action_refs {
+    id: 16797540
+  }
+  action_refs {
+    id: 16821201
+  }
+  action_refs {
+    id: 16800567
+    annotations: "@defaultonly"
+    scope: DEFAULT_ONLY
+  }
+  size: 16
+  is_const_table: true
+}
+tables {
+  preamble {
+    id: 33563939
+    name: "MyEgress.process_int_report.tb_generate_report"
+    alias: "tb_generate_report"
+  }
+  match_fields {
+    id: 1
+    name: "int_is_valid"
+    bitwidth: 1
+    match_type: EXACT
+  }
+  action_refs {
+    id: 16819362
+  }
+  action_refs {
+    id: 16800567
+  }
+  size: 1024
+}
+actions {
+  preamble {
+    id: 16800567
+    name: "NoAction"
+    alias: "NoAction"
+  }
+}
+actions {
+  preamble {
+    id: 16781077
+    name: "MyIngress.table0_portforward_control.set_next_hop_id"
+    alias: "set_next_hop_id"
+  }
+  params {
+    id: 1
+    name: "next_hop_id"
+    bitwidth: 16
+  }
+}
+actions {
+  preamble {
+    id: 16779678
+    name: "MyIngress.table0_portforward_control.send_to_cpu"
+    alias: "send_to_cpu"
+  }
+}
+actions {
+  preamble {
+    id: 16831713
+    name: "MyIngress.table0_portforward_control.set_egress_port"
+    alias: "set_egress_port"
+  }
+  params {
+    id: 1
+    name: "port"
+    bitwidth: 9
+  }
+}
+actions {
+  preamble {
+    id: 16793765
+    name: "MyIngress.table0_portforward_control.drop"
+    alias: "drop"
+  }
+}
+actions {
+  preamble {
+    id: 16821886
+    name: "MyIngress.process_int_source_sink.int_set_source"
+    alias: "int_set_source"
+  }
+}
+actions {
+  preamble {
+    id: 16819102
+    name: "MyIngress.process_int_source_sink.int_set_sink"
+    alias: "int_set_sink"
+  }
+}
+actions {
+  preamble {
+    id: 16793391
+    name: "MyIngress.process_int_source.int_source"
+    alias: "int_source"
+  }
+  params {
+    id: 1
+    name: "hop_metadata_len"
+    bitwidth: 5
+  }
+  params {
+    id: 2
+    name: "remaining_hop_cnt"
+    bitwidth: 8
+  }
+  params {
+    id: 3
+    name: "ins_mask0003"
+    bitwidth: 4
+  }
+  params {
+    id: 4
+    name: "ins_mask0407"
+    bitwidth: 4
+  }
+}
+actions {
+  preamble {
+    id: 16789499
+    name: "MyEgress.process_int_transit.init_metadata"
+    alias: "init_metadata"
+  }
+  params {
+    id: 1
+    name: "switch_id"
+    bitwidth: 32
+  }
+}
+actions {
+  preamble {
+    id: 16798370
+    name: "MyEgress.process_int_transit.int_set_header_0003_i0"
+    alias: "int_set_header_0003_i0"
+  }
+}
+actions {
+  preamble {
+    id: 16813326
+    name: "MyEgress.process_int_transit.int_set_header_0003_i1"
+    alias: "int_set_header_0003_i1"
+  }
+}
+actions {
+  preamble {
+    id: 16806712
+    name: "MyEgress.process_int_transit.int_set_header_0003_i2"
+    alias: "int_set_header_0003_i2"
+  }
+}
+actions {
+  preamble {
+    id: 16821560
+    name: "MyEgress.process_int_transit.int_set_header_0003_i3"
+    alias: "int_set_header_0003_i3"
+  }
+}
+actions {
+  preamble {
+    id: 16796125
+    name: "MyEgress.process_int_transit.int_set_header_0003_i4"
+    alias: "int_set_header_0003_i4"
+  }
+}
+actions {
+  preamble {
+    id: 16802887
+    name: "MyEgress.process_int_transit.int_set_header_0003_i5"
+    alias: "int_set_header_0003_i5"
+  }
+}
+actions {
+  preamble {
+    id: 16834830
+    name: "MyEgress.process_int_transit.int_set_header_0003_i6"
+    alias: "int_set_header_0003_i6"
+  }
+}
+actions {
+  preamble {
+    id: 16784042
+    name: "MyEgress.process_int_transit.int_set_header_0003_i7"
+    alias: "int_set_header_0003_i7"
+  }
+}
+actions {
+  preamble {
+    id: 16791046
+    name: "MyEgress.process_int_transit.int_set_header_0003_i8"
+    alias: "int_set_header_0003_i8"
+  }
+}
+actions {
+  preamble {
+    id: 16833415
+    name: "MyEgress.process_int_transit.int_set_header_0003_i9"
+    alias: "int_set_header_0003_i9"
+  }
+}
+actions {
+  preamble {
+    id: 16832311
+    name: "MyEgress.process_int_transit.int_set_header_0003_i10"
+    alias: "int_set_header_0003_i10"
+  }
+}
+actions {
+  preamble {
+    id: 16827646
+    name: "MyEgress.process_int_transit.int_set_header_0003_i11"
+    alias: "int_set_header_0003_i11"
+  }
+}
+actions {
+  preamble {
+    id: 16836722
+    name: "MyEgress.process_int_transit.int_set_header_0003_i12"
+    alias: "int_set_header_0003_i12"
+  }
+}
+actions {
+  preamble {
+    id: 16824663
+    name: "MyEgress.process_int_transit.int_set_header_0003_i13"
+    alias: "int_set_header_0003_i13"
+  }
+}
+actions {
+  preamble {
+    id: 16834274
+    name: "MyEgress.process_int_transit.int_set_header_0003_i14"
+    alias: "int_set_header_0003_i14"
+  }
+}
+actions {
+  preamble {
+    id: 16806796
+    name: "MyEgress.process_int_transit.int_set_header_0003_i15"
+    alias: "int_set_header_0003_i15"
+  }
+}
+actions {
+  preamble {
+    id: 16812339
+    name: "MyEgress.process_int_transit.int_set_header_0407_i0"
+    alias: "int_set_header_0407_i0"
+  }
+}
+actions {
+  preamble {
+    id: 16798323
+    name: "MyEgress.process_int_transit.int_set_header_0407_i1"
+    alias: "int_set_header_0407_i1"
+  }
+}
+actions {
+  preamble {
+    id: 16824054
+    name: "MyEgress.process_int_transit.int_set_header_0407_i2"
+    alias: "int_set_header_0407_i2"
+  }
+}
+actions {
+  preamble {
+    id: 16815932
+    name: "MyEgress.process_int_transit.int_set_header_0407_i3"
+    alias: "int_set_header_0407_i3"
+  }
+}
+actions {
+  preamble {
+    id: 16817924
+    name: "MyEgress.process_int_transit.int_set_header_0407_i4"
+    alias: "int_set_header_0407_i4"
+  }
+}
+actions {
+  preamble {
+    id: 16802448
+    name: "MyEgress.process_int_transit.int_set_header_0407_i5"
+    alias: "int_set_header_0407_i5"
+  }
+}
+actions {
+  preamble {
+    id: 16828013
+    name: "MyEgress.process_int_transit.int_set_header_0407_i6"
+    alias: "int_set_header_0407_i6"
+  }
+}
+actions {
+  preamble {
+    id: 16786926
+    name: "MyEgress.process_int_transit.int_set_header_0407_i7"
+    alias: "int_set_header_0407_i7"
+  }
+}
+actions {
+  preamble {
+    id: 16788886
+    name: "MyEgress.process_int_transit.int_set_header_0407_i8"
+    alias: "int_set_header_0407_i8"
+  }
+}
+actions {
+  preamble {
+    id: 16839014
+    name: "MyEgress.process_int_transit.int_set_header_0407_i9"
+    alias: "int_set_header_0407_i9"
+  }
+}
+actions {
+  preamble {
+    id: 16793713
+    name: "MyEgress.process_int_transit.int_set_header_0407_i10"
+    alias: "int_set_header_0407_i10"
+  }
+}
+actions {
+  preamble {
+    id: 16792839
+    name: "MyEgress.process_int_transit.int_set_header_0407_i11"
+    alias: "int_set_header_0407_i11"
+  }
+}
+actions {
+  preamble {
+    id: 16790541
+    name: "MyEgress.process_int_transit.int_set_header_0407_i12"
+    alias: "int_set_header_0407_i12"
+  }
+}
+actions {
+  preamble {
+    id: 16814224
+    name: "MyEgress.process_int_transit.int_set_header_0407_i13"
+    alias: "int_set_header_0407_i13"
+  }
+}
+actions {
+  preamble {
+    id: 16797540
+    name: "MyEgress.process_int_transit.int_set_header_0407_i14"
+    alias: "int_set_header_0407_i14"
+  }
+}
+actions {
+  preamble {
+    id: 16821201
+    name: "MyEgress.process_int_transit.int_set_header_0407_i15"
+    alias: "int_set_header_0407_i15"
+  }
+}
+actions {
+  preamble {
+    id: 16819362
+    name: "MyEgress.process_int_report.do_report_encapsulation"
+    alias: "do_report_encapsulation"
+  }
+  params {
+    id: 1
+    name: "src_mac"
+    bitwidth: 48
+  }
+  params {
+    id: 2
+    name: "mon_mac"
+    bitwidth: 48
+  }
+  params {
+    id: 3
+    name: "src_ip"
+    bitwidth: 32
+  }
+  params {
+    id: 4
+    name: "mon_ip"
+    bitwidth: 32
+  }
+  params {
+    id: 5
+    name: "mon_port"
+    bitwidth: 16
+  }
+}
+actions {
+  preamble {
+    id: 16819600
+    name: "MyEgress.process_int_sink.restore_header"
+    alias: "restore_header"
+  }
+}
+actions {
+  preamble {
+    id: 16824416
+    name: "MyEgress.process_int_sink.int_sink"
+    alias: "int_sink"
+  }
+}
+counters {
+  preamble {
+    id: 301997337
+    name: "MyIngress.port_counters_ingress.ingress_port_counter"
+    alias: "ingress_port_counter"
+  }
+  spec {
+    unit: PACKETS
+  }
+  size: 511
+}
+counters {
+  preamble {
+    id: 302050525
+    name: "MyEgress.port_counters_egress.egress_port_counter"
+    alias: "egress_port_counter"
+  }
+  spec {
+    unit: PACKETS
+  }
+  size: 511
+}
+direct_counters {
+  preamble {
+    id: 318774144
+    name: "MyIngress.table0_portforward_control.table0_counter"
+    alias: "table0_counter"
+  }
+  spec {
+    unit: BOTH
+  }
+  direct_table_id: 33564444
+}
+direct_counters {
+  preamble {
+    id: 318792132
+    name: "MyIngress.process_int_source_sink.counter_set_source"
+    alias: "counter_set_source"
+  }
+  spec {
+    unit: BOTH
+  }
+  direct_table_id: 33580202
+}
+direct_counters {
+  preamble {
+    id: 318792099
+    name: "MyIngress.process_int_source_sink.counter_set_sink"
+    alias: "counter_set_sink"
+  }
+  spec {
+    unit: BOTH
+  }
+  direct_table_id: 33580474
+}
+direct_counters {
+  preamble {
+    id: 318788515
+    name: "MyIngress.process_int_source.counter_int_source"
+    alias: "counter_int_source"
+  }
+  spec {
+    unit: BOTH
+  }
+  direct_table_id: 33596879
+}
+meters {
+  preamble {
+    id: 335589341
+    name: "MyIngress.port_meters_ingress.ingress_port_meter"
+    alias: "ingress_port_meter"
+  }
+  spec {
+    unit: BYTES
+  }
+  size: 511
+}
+meters {
+  preamble {
+    id: 335608964
+    name: "MyEgress.port_meters_egress.egress_port_meter"
+    alias: "egress_port_meter"
+  }
+  spec {
+    unit: BYTES
+  }
+  size: 511
+}
+controller_packet_metadata {
+  preamble {
+    id: 67146229
+    name: "packet_in"
+    alias: "packet_in"
+    annotations: "@controller_header(\"packet_in\")"
+  }
+  metadata {
+    id: 1
+    name: "ingress_port"
+    bitwidth: 9
+  }
+  metadata {
+    id: 2
+    name: "_padding"
+    bitwidth: 7
+  }
+}
+controller_packet_metadata {
+  preamble {
+    id: 67121543
+    name: "packet_out"
+    alias: "packet_out"
+    annotations: "@controller_header(\"packet_out\")"
+  }
+  metadata {
+    id: 1
+    name: "egress_port"
+    bitwidth: 9
+  }
+  metadata {
+    id: 2
+    name: "_padding"
+    bitwidth: 7
+  }
+}
+type_info {
+}
