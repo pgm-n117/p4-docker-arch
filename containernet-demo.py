@@ -196,12 +196,17 @@ def main():
                                   privileged=True, 
                                   cgroup_parent="docker.slice", 
                                   volumes=[
-                                            #ONOS_LOCAL_APPS_DIRECTORY+"mecp4app"+"/target"+":"+ONOS_DOCKER_APPS_DIRECTORY+"org.mecp4.app"+":rw",
-                                            #os.getcwd()+"/controller/mecp4app/target/oar/m2/mecp4:/root/onos/apache-karaf-4.2.9/system/mecp4"+":rw",
+                                            #Mount ONOS applications. app.xml and oar file is needed for each application
+                                            #mecp4 for forwarding
+                                            ONOS_LOCAL_APPS_DIRECTORY+"mecp4app"+"/target/oar/app.xml"+":"+ONOS_DOCKER_APPS_DIRECTORY+"org.mecp4.app/app.xml"+":rw",
+                                            ONOS_LOCAL_APPS_DIRECTORY+"mecp4app"+"/target/mecp4-1.0-SNAPSHOT.oar"+":"+ONOS_DOCKER_APPS_DIRECTORY+"org.mecp4.app/mecp4-1.0-SNAPSHOT.oar"+":rw",
+                                            os.getcwd()+"/controller/mecp4app/target/oar/m2/mecp4:/root/onos/apache-karaf-4.2.9/system/mecp4"+":rw",
 
-                                            ONOS_LOCAL_APPS_DIRECTORY+"customPipeline"+"/target"+":"+ONOS_DOCKER_APPS_DIRECTORY+"org.customPipeline.app"+":rw",
+                                            #customPipeline for integration with controller, and INT
+                                            ONOS_LOCAL_APPS_DIRECTORY+"customPipeline"+"/target/oar/app.xml"+":"+ONOS_DOCKER_APPS_DIRECTORY+"org.customPipeline.app/app.xml"+":rw",
+                                            ONOS_LOCAL_APPS_DIRECTORY+"customPipeline"+"/target/customPipeline-1.0-SNAPSHOT.oar"+":"+ONOS_DOCKER_APPS_DIRECTORY+"org.customPipeline.app/customPipeline-1.0-SNAPSHOT.oar"+":rw",
                                             os.getcwd()+"/controller/customPipeline/target/oar/m2/customPipeline:/root/onos/apache-karaf-4.2.9/system/customPipeline"+":rw",
-
+                                            
                                             ONOS_LOCAL_APPS_DIRECTORY+"org.apache.karaf.features.cfg"+":/root/onos/apache-karaf-4.2.9/etc/org.apache.karaf.features.cfg:rw"
                                         ])
             
