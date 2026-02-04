@@ -3,7 +3,6 @@
 *.jar
 *.class
 *.idea
-target
 controller/custominbandtelemetry/
 test*/
 *.pcap
