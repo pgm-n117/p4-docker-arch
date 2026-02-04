@@ -87,7 +87,6 @@ Finish installation of Containernet
 pip install -e . --no-binary :all:
 ```
 
-And then exit the venv with ```deactivate```
 
 ## Make sure Docker works without sudo
 (From https://docs.docker.com/engine/install/linux-postinstall/)
