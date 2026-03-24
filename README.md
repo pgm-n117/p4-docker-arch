@@ -19,7 +19,12 @@ sudo apt install -y \
   liblzma-dev \
   tk-dev \
   xz-utils \
-  ca-certificates
+  ca-certificates \
+  ethtool \
+  iproute2 \
+  net-tools \
+  iputils-ping \
+  iputils-arping
 ```
 Install:
 ```
