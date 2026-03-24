@@ -22,7 +22,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.errorprone.annotations.Immutable;
 
 import org.apache.commons.lang.exception.ExceptionUtils;
-import org.mecp4.app.IntConstants;
+
 import org.onlab.graph.ScalarWeight;
 import org.onlab.packet.*;
 import org.onosproject.cfg.ComponentConfigService;
@@ -74,6 +74,7 @@ import org.onosproject.net.pi.runtime.*;
 
 
 import java.util.Optional;
+import static org.mecp4.app.CustomConstants.*;
 
 import static java.nio.ByteBuffer.wrap;
 import static org.onosproject.net.config.basics.SubjectFactories.DEVICE_SUBJECT_FACTORY;
@@ -676,21 +677,21 @@ public class P4Routing implements P4RoutingInterface{
             PiCriterion.Builder piMatchCriterion = PiCriterion.builder();
             piMatchCriterion.
                     //match of exact ipv4 protocol
-                    matchTernary(BasicPipelineConstants.HDR_HDR_ETHERNET_ETHER_TYPE, Ethernet.TYPE_IPV4, Ethernet.TYPE_IPV4).
+                    matchTernary(HDR_ETHERNET_ETHER_TYPE, Ethernet.TYPE_IPV4, Ethernet.TYPE_IPV4).
                     //match of exact src and dst ip addresses
-                    matchTernary(BasicPipelineConstants.HDR_HDR_IPV4_SRC_ADDR, srcIp.toOctets(), Ip4Address.valueOf("255.255.255.255").toOctets()).
-                    matchTernary(BasicPipelineConstants.HDR_HDR_IPV4_DST_ADDR, dstIp.toOctets(), Ip4Address.valueOf("255.255.255.255").toOctets());
+                    matchTernary(HDR_IPV4_SRC_ADDR, srcIp.toOctets(), Ip4Address.valueOf("255.255.255.255").toOctets()).
+                    matchTernary(HDR_IPV4_DST_ADDR, dstIp.toOctets(), Ip4Address.valueOf("255.255.255.255").toOctets());
 
 
             if(protocol == IPv4.PROTOCOL_ICMP){
-                piMatchCriterion.matchTernary(BasicPipelineConstants.HDR_HDR_IPV4_PROTOCOL, protocol, IPv4.PROTOCOL_ICMP);
+                piMatchCriterion.matchTernary(HDR_IPV4_PROTOCOL, protocol, IPv4.PROTOCOL_ICMP);
 
 
             }else if (protocol == IPv4.PROTOCOL_TCP || protocol == IPv4.PROTOCOL_UDP){
                 piMatchCriterion.
                         //match exact ports from UDP or TCP
-                    matchTernary(BasicPipelineConstants.HDR_LOCAL_METADATA_L4_SRC_PORT, TpPort.tpPort(srcIpPort).toInt(), TpPort.MAX_PORT).
-                    matchTernary(BasicPipelineConstants.HDR_LOCAL_METADATA_L4_DST_PORT, TpPort.tpPort(dstIpPort).toInt(), TpPort.MAX_PORT);
+                    matchTernary(HDR_LOCAL_METADATA_L4_SRC_PORT, TpPort.tpPort(srcIpPort).toInt(), TpPort.MAX_PORT).
+                    matchTernary(HDR_LOCAL_METADATA_L4_DST_PORT, TpPort.tpPort(dstIpPort).toInt(), TpPort.MAX_PORT);
             }
 
             TrafficSelector.Builder piSelector = DefaultTrafficSelector.builder().
@@ -701,10 +702,10 @@ public class P4Routing implements P4RoutingInterface{
             log.info("Packet from "+srcIp.toString()+" goes through DEV "+dstConnectionPoint.toString()+", PORT "+dstConnectionPoint.port().toString());
 
             //TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder().setOutput(dstConnectionPoint.port());
-            PiTableAction table0_drop = PiAction.builder().withId(PiActionId.of("ingress.table0_control.drop")).build();
+            PiTableAction table0_drop = PiAction.builder().withId(INGRESS_TABLE0_DROP).build();
 
-            PiActionParamId PORT = PiActionParamId.of("port");
-            PiTableAction table0_egress_port = PiAction.builder().withId(PiActionId.of("ingress.table0_control.set_egress_port")).withParameter(new PiActionParam(PORT, dstConnectionPoint.port().toLong())).build();
+
+            PiTableAction table0_egress_port = PiAction.builder().withId(INGRESS_TABLE0_SET_EGRESS_PORT).withParameter(new PiActionParam(PORT, dstConnectionPoint.port().toLong())).build();
 
             TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder().piTableAction(table0_egress_port);
 
@@ -732,22 +733,22 @@ public class P4Routing implements P4RoutingInterface{
 
             PiCriterion.Builder piMatchCriterion = PiCriterion.builder();
             piMatchCriterion.
-                //match of exact ipv4 protocol
-                matchTernary(BasicPipelineConstants.HDR_HDR_ETHERNET_ETHER_TYPE, Ethernet.TYPE_IPV4, Ethernet.TYPE_IPV4).
-                //match of exact src and dst ip addresses
-                matchTernary(BasicPipelineConstants.HDR_HDR_IPV4_SRC_ADDR, srcIp.toOctets(), Ip4Address.valueOf("255.255.255.255").toOctets()).
-                matchTernary(BasicPipelineConstants.HDR_HDR_IPV4_DST_ADDR, dstIp.toOctets(), Ip4Address.valueOf("255.255.255.255").toOctets());
+                    //match of exact ipv4 protocol
+                    matchTernary(HDR_ETHERNET_ETHER_TYPE, Ethernet.TYPE_IPV4, Ethernet.TYPE_IPV4).
+                    //match of exact src and dst ip addresses
+                    matchTernary(HDR_IPV4_SRC_ADDR, srcIp.toOctets(), Ip4Address.valueOf("255.255.255.255").toOctets()).
+                    matchTernary(HDR_IPV4_DST_ADDR, dstIp.toOctets(), Ip4Address.valueOf("255.255.255.255").toOctets());
 
 
 
 
             if(protocol == IPv4.PROTOCOL_ICMP){
-                piMatchCriterion.matchTernary(BasicPipelineConstants.HDR_HDR_IPV4_PROTOCOL, protocol, IPv4.PROTOCOL_ICMP);
+                piMatchCriterion.matchTernary(HDR_IPV4_PROTOCOL, protocol, IPv4.PROTOCOL_ICMP);
             }else if (protocol == IPv4.PROTOCOL_TCP || protocol == IPv4.PROTOCOL_UDP){
                 piMatchCriterion.
                     //match exact ports from UDP or TCP
-                    matchTernary(BasicPipelineConstants.HDR_LOCAL_METADATA_L4_SRC_PORT, TpPort.tpPort(srcIpPort).toInt(), TpPort.MAX_PORT).
-                    matchTernary(BasicPipelineConstants.HDR_LOCAL_METADATA_L4_DST_PORT, TpPort.tpPort(dstIpPort).toInt(), TpPort.MAX_PORT);
+                    matchTernary(HDR_LOCAL_METADATA_L4_SRC_PORT, TpPort.tpPort(srcIpPort).toInt(), TpPort.MAX_PORT).
+                    matchTernary(HDR_LOCAL_METADATA_L4_DST_PORT, TpPort.tpPort(dstIpPort).toInt(), TpPort.MAX_PORT);
             }
 
             TrafficSelector.Builder piSelector = DefaultTrafficSelector.builder().
@@ -756,10 +757,9 @@ public class P4Routing implements P4RoutingInterface{
             //Treatment rule
             log.info("Packet from "+srcIp.toString()+" goes through DEV "+dstConnectionPoint.toString()+", PORT "+outputPort.toString());
             //TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder().setOutput(outputPort).setEthDst(dstMac);
-            PiTableAction table0_drop = PiAction.builder().withId(PiActionId.of("ingress.table0_control.drop")).build();
+            PiTableAction table0_drop = PiAction.builder().withId(INGRESS_TABLE0_DROP).build();
 
-            PiActionParamId PORT = PiActionParamId.of("port");
-            PiTableAction table0_egress_port = PiAction.builder().withId(PiActionId.of("ingress.table0_control.set_egress_port")).withParameter(new PiActionParam(PORT, outputPort.toLong())).build();
+            PiTableAction table0_egress_port = PiAction.builder().withId(INGRESS_TABLE0_SET_EGRESS_PORT).withParameter(new PiActionParam(PORT, outputPort.toLong())).build();
 
             TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder().piTableAction(table0_egress_port);
 

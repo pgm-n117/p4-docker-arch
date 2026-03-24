@@ -90,7 +90,7 @@ public final class PipeconfLoader {
                     .addBehaviour(PiPipelineInterpreter.class, INTMDInterpreterImpl.class)
                     .addBehaviour(Pipeliner.class, INTMDPipelinerImpl.class)
                     .addBehaviour(PortStatisticsDiscovery.class, PortStatisticsDiscoveryImpl.class)
-                    .addBehaviour(IntProgrammable.class, INTMDProgrammableImpl.class)
+                    //.addBehaviour(IntProgrammable.class, INTMDProgrammableImpl.class)
                     .addExtension(P4_INFO_TEXT, p4InfoUrl)
                     .addExtension(BMV2_JSON, jsonUrl)
                     .build();

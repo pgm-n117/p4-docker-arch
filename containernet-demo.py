@@ -222,7 +222,7 @@ def main():
                     controllerAddress=(CONTROLLER_ADDRESS if controller is not None else None),
                     collectorAddress=reportCollector,
                     switch=StratumBmv2DockerSwitch,
-                    HostCls=Host)
+                    HostCls=P4Host)
 
     topo.addController('c0', controller=RemoteController, ip=CONTROLLER_ADDRESS, port=8181)
     
@@ -230,9 +230,6 @@ def main():
         topo.start()
 
         sleep(1)
-
-        if reportCollector:
-            topo.collector.start()
 
         for host in topo.hosts:
             print(" " + host.name)

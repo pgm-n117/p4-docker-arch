@@ -252,12 +252,14 @@ class StratumBmv2DockerSwitch(DockerSwitch):
         if self.intApplication is not None:
             INTCONFIG = {
               "sinkMAC": self.dcinfo["NetworkSettings"]["Networks"]["bridge"]["MacAddress"],
-              "collectorMAC": reportConfig["reportCollectorMAC"],
               "minFlowHopLatencyChangeNs": 32,
               "sinkIP": srcIP,
-              "collectorIP": reportConfig["reportCollectorIp"],
-              "collectorPort": reportConfig["reportCollectorPort"],
             }
+
+            if reportConfig is not None:
+                INTCONFIG["collectorMAC"] = reportConfig["reportCollectorMAC"]
+                INTCONFIG["collectorIP"] = reportConfig["reportCollectorIp"]
+                INTCONFIG["collectorPort"] = reportConfig["reportCollectorPort"]
             
             print("Including INT application in the configuration")
             cfgData["devices"][self.onosDeviceId]["int"] = INTCONFIG

@@ -1637,7 +1637,7 @@
       "id" : 1,
       "source_info" : {
         "filename" : "int/checksums.p4",
-        "line" : 54,
+        "line" : 53,
         "column" : 8,
         "source_fragment" : "update_checksum(hdr.report_ipv4.isValid(), ..."
       },
@@ -1698,7 +1698,7 @@
       "id" : 2,
       "source_info" : {
         "filename" : "int/checksums.p4",
-        "line" : 73,
+        "line" : 72,
         "column" : 8,
         "source_fragment" : "update_checksum_with_payload(hdr.report_udp.isValid(), ..."
       },
@@ -13179,7 +13179,7 @@
       "id" : 1,
       "source_info" : {
         "filename" : "int/checksums.p4",
-        "line" : 54,
+        "line" : 53,
         "column" : 8,
         "source_fragment" : "update_checksum(hdr.report_ipv4.isValid(), ..."
       },
@@ -13205,7 +13205,7 @@
       "id" : 2,
       "source_info" : {
         "filename" : "int/checksums.p4",
-        "line" : 73,
+        "line" : 72,
         "column" : 8,
         "source_fragment" : "update_checksum_with_payload(hdr.report_udp.isValid(), ..."
       },

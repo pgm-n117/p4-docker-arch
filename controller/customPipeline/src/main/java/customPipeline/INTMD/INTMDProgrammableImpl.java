@@ -345,9 +345,15 @@ public class INTMDProgrammableImpl extends AbstractHandlerBehaviour implements I
         JsonNode node = netcfgService.getConfigs(deviceId).stream().collect(Collectors.toMap(Config<DeviceId>::key, Function.identity())).get("int").node();
         //netcfgService.getConfigs(deviceId).stream().collect(Collectors.toMap(Config<DeviceId>::key, Function.identity())).get("int").node().object._children.get("collectorIP").toString()
         //P4Config intConfig = netcfgService.getConfig(deviceId, P4Config.class);
-        IpAddress collectorIp = Ip4Address.valueOf(node.get("collectorIP").asText());
-        Set<Host> availableCollector = hostService.getHostsByIp(collectorIp);
+        IpAddress collectorIp = Ip4Address.ZERO;
+        try {
+            collectorIp = Ip4Address.valueOf(node.get("collectorIP").asText());
 
+        }catch(NullPointerException e){
+            log.error("INT Report Collector not configured. Collector IP not existing in device netcfg.");
+        }
+
+        Set<Host> availableCollector = hostService.getHostsByIp(collectorIp);
         if(availableCollector.isEmpty()) {
             log.info("INT Report Collector not available");
             log.error("❌ Failed to configure clone session {} on device {}", CLONE_SESSION_ID, deviceId);

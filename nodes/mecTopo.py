@@ -2,6 +2,8 @@ from mininet.topo import Topo
 from mininet.node import RemoteController
 from mininet.link import TCLink, Link, Intf
 from mininet.net import Containernet, Docker
+
+from nodes.dhosts.DockerHost.DockerHost import DockerHost
 from .p4_mininet import P4Host
 #from .dhosts.dcollector.DockerReportCollector import DockerReportCollector
 import math
@@ -27,15 +29,25 @@ class MECTopo(Containernet):
 
         self.topology = topology
         self.controllerAddress = controllerAddress
-        self.collectorIP = collectorAddress.split(":")[0] if collectorAddress is not None else None
-        self.collectorPort = collectorAddress.split(":")[1] if collectorAddress is not None else None
-        self.collectorMAC = "00:00:0A:00:00:FD" #TODO: this mac address is 10.0.0.253 in hex, change later
+        #self.collectorIP = collectorAddress.split(":")[0] if collectorAddress is not None else None
+        #self.collectorPort = collectorAddress.split(":")[1] if collectorAddress is not None else None
+        #self.collectorMAC = "00:00:0A:00:00:FD" #TODO: this mac address is 10.0.0.253 in hex, change later
         self.N = N
         self.M = M
         self.sw_path = sw_path
         self.json_path = json_path
         self.collector = None
         self.HostCls = HostCls
+
+        if collectorAddress is not None: #TODO: this mac address is 10.0.0.253 in hex, change later
+            self.collector_config = {
+                "reportCollectorIp": collectorAddress.split(":")[0],
+                "reportCollectorPort": collectorAddress.split(":")[1],
+                "reportCollectorMAC": "00:00:0A:00:00:FD"
+            }
+        else:
+            self.collector_config = None
+
 
         print("WORKING DIRECTORY CWD = " + os.getcwd())
 
@@ -81,7 +93,7 @@ class MECTopo(Containernet):
                             dcmd="/bin/sh",
                             privileged=True, 
                             cgroup_parent="docker.slice",
-                            dimage="ubuntu:latest",
+                            dimage="python-collector:latest",
                             ip = "10.0.0.10%d/24" % index,
                             mac = '00:05:00:00:00:%02x' %index,
                             defaultRoute = "dev eth0")
@@ -94,7 +106,7 @@ class MECTopo(Containernet):
                                     privileged=True, 
                                     cgroup_parent="docker.slice",
                                     controllerAddress=self.controllerAddress,
-                                    reportConfig={"reportCollectorIp":self.collectorIP, "reportCollectorPort":self.collectorPort, "reportCollectorMAC":self.collectorMAC}, #TODO: this mac address is 10.0.0.253 in hex, change later
+                                    reportConfig=self.collector_config, 
                                     intApplication = "org.mecp4.app",
                                     **common_docker_kwargs,
                                     pipeconf="org.onosproject.pipelines.intmd",
@@ -112,7 +124,7 @@ class MECTopo(Containernet):
                                     privileged=True, 
                                     cgroup_parent="docker.slice",
                                     controllerAddress=self.controllerAddress,
-                                    reportConfig={"reportCollectorIp":self.collectorIP, "reportCollectorPort":self.collectorPort, "reportCollectorMAC":self.collectorMAC}, #TODO: this mac address is 10.0.0.253 in hex, change later
+                                    reportConfig=self.collector_config, #TODO: this mac address is 10.0.0.253 in hex, change later
                                     intApplication = "org.mecp4.app",
                                     **common_docker_kwargs,
                                     pipeconf="org.onosproject.pipelines.intmd",
@@ -126,21 +138,20 @@ class MECTopo(Containernet):
             self.addLink(link[0], link[1], cls=Link)
 
 
-        if self.collectorIP and self.collectorPort:
-
+        if self.collector_config is not None:
             self.collector = self.addDocker("collector",
-                            cls=DockerReportCollector,
-                            #dcmd="python3 -m flask run --host=0.0.0.0",
-                            dcmd="/bin/bash",
+                            dcmd="/bin/sh",
                             privileged=True, 
                             cgroup_parent="docker.slice",
-                            dimage="flask-debian",
-                            ip=self.collectorIP+"/24",
-                            ports=[self.collectorPort+"/udp", 5000],
-                            port_bindings={self.collectorPort+"/udp":self.collectorPort+"/udp", '5005/tcp':'5000/tcp'},
+                            dimage="python-collector:latest",
+                            #ip = "10.0.0.10%d/24" % index,
+                            ip=self.collector_config["reportCollectorIp"]+"/24",
+                            #mac = '00:05:00:00:00:%02x' %index,
+                            mac = self.collector_config["reportCollectorMAC"],
                             defaultRoute = "dev eth0",
-                            volumes=[os.getcwd()+"/nodes/dhosts/dcollector"+":/dcollector:rw"],
-                            reportConfig={"reportCollectorIp":self.collectorIP, "reportCollectorPort":self.collectorPort, "reportCollectorMAC":self.collectorMAC}, #TODO: this mac address is 10.0.0.253 in hex, change later            
+                            ports=[self.collector_config["reportCollectorPort"], 5000],
+                            port_bindings={self.collector_config["reportCollectorPort"]+"/udp":self.collector_config["reportCollectorPort"]+"/udp", '5005/tcp':'5000/tcp'},
+                            volumes=[os.getcwd()+"/nodes/dhosts/dcollector"+":/dcollector:rw"]
                             )
             
             
@@ -150,7 +161,7 @@ class MECTopo(Containernet):
             #                mac="00:00:0A:00:00:FD", #TODO: this mac address is 10.0.0.253 in hex, change later            
             #                cls=P4Host)
             
-            
+        if self.collector is not None:
             self.addLink("collector", topology['spine_switches'][2], cls=Link) #connect the collector to a spine switch (this turns the switch into a leaf switch!!)
 
 

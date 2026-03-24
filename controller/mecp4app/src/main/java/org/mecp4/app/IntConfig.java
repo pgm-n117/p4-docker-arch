@@ -27,7 +27,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-import org.mecp4.app.Constants;
+import static org.mecp4.app.CustomConstants.*;
 
 import static org.mecp4.app.Constants.DEFAULT_PRIORITY;
 
@@ -273,12 +273,12 @@ public class IntConfig {
                 .build();
 
         PiActionParam reportOutPort = new PiActionParam(
-                IntConstants.PORT,
+                PORT,
                 port.toLong()
         );
 
         PiAction reportAction = PiAction.builder()
-                .withId(IntConstants.SET_REPORT_FORWARDING_PORT)
+                .withId(SET_REPORT_FORWARDING_PORT)
                 .withParameter(reportOutPort)
                 .build();
 
@@ -293,7 +293,7 @@ public class IntConfig {
                 .withPriority(FlowRule.MAX_PRIORITY)
                 .makePermanent()
                 .forDevice(deviceId)
-                .forTable(IntConstants.EGRESS_FORWARD_INT_REPORT)
+                .forTable(EGRESS_FORWARD_INT_REPORT)
                 .build();
 
         FlowId reportFlowId = reportFlowrule.id();

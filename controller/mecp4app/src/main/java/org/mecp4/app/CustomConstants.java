@@ -3,7 +3,7 @@ package org.mecp4.app;
 import org.onosproject.net.pi.model.*;
 
 
-public class IntConstants {
+public class CustomConstants {
     //Header fields for match in tables
     public static final PiMatchFieldId HDR_STANDARD_METADATA_INGRESS_PORT =
             PiMatchFieldId.of("standard_metadata.ingress_port");
