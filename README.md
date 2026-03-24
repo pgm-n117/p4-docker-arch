@@ -24,7 +24,8 @@ sudo apt install -y \
   iproute2 \
   net-tools \
   iputils-ping \
-  iputils-arping
+  iputils-arping \
+  iperf3
 ```
 Install:
 ```
